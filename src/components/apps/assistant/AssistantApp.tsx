@@ -230,11 +230,11 @@ export function AssistantApp() {
         </div>
         <div className="flex-1 overflow-y-auto p-1.5 space-y-1">
           {(conversations ?? []).map((c) => (
-            <button
+            <div
               key={c.id}
               onClick={() => setActiveConvId(c.id)}
               className={cn(
-                "w-full text-left p-2 rounded-md text-xs transition group",
+                "w-full text-left p-2 rounded-md text-xs transition group cursor-pointer",
                 activeConvId === c.id ? "bg-muted/60" : "hover:bg-muted/40",
               )}
             >
@@ -248,7 +248,7 @@ export function AssistantApp() {
                   <Trash2 className="w-3 h-3" />
                 </button>
               </div>
-            </button>
+            </div>
           ))}
           {(!conversations || conversations.length === 0) && (
             <div className="text-center text-[10px] text-muted-foreground py-4">
