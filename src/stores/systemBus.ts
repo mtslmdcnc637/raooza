@@ -16,6 +16,17 @@ interface SystemBus {
   openAssistant: (msg?: string) => void;
   assistantOpener: ((msg?: string) => void) | null;
   registerAssistantOpener: (fn: (msg?: string) => void) => void;
+  // Focus mode
+  focusMode: boolean;
+  focusTaskId?: string;
+  enterFocusMode: (taskId?: string) => void;
+  exitFocusMode: () => void;
+  // Time tracker signal (for global timer indicator)
+  trackerActive: boolean;
+  setTrackerActive: (b: boolean) => void;
+  // Dashboard refresh
+  dashboardTick: number;
+  triggerDashboard: () => void;
 }
 
 export interface NotificationItem {
@@ -51,4 +62,15 @@ export const useSystemBus = create<SystemBus>((set, get) => ({
   },
   assistantOpener: null,
   registerAssistantOpener: (fn) => set({ assistantOpener: fn }),
+
+  focusMode: false,
+  focusTaskId: undefined,
+  enterFocusMode: (taskId) => set({ focusMode: true, focusTaskId: taskId }),
+  exitFocusMode: () => set({ focusMode: false, focusTaskId: undefined }),
+
+  trackerActive: false,
+  setTrackerActive: (b) => set({ trackerActive: b }),
+
+  dashboardTick: 0,
+  triggerDashboard: () => set((s) => ({ dashboardTick: s.dashboardTick + 1 })),
 }));

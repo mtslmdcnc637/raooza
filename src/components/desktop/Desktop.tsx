@@ -6,6 +6,8 @@ import { useWindowStore } from "@/stores/windowStore";
 import { Window } from "./Window";
 import { Taskbar } from "./Taskbar";
 import { StickyNotesLayer } from "./StickyNotesLayer";
+import { DashboardWidget } from "./dashboard/DashboardWidget";
+import { FocusMode } from "./focusmode/FocusMode";
 import { useSystemBus } from "@/stores/systemBus";
 import { APP_REGISTRY } from "@/components/apps/registry";
 
@@ -32,6 +34,9 @@ export function Desktop() {
       className="fixed inset-0 overflow-hidden"
       style={{ background: bg }}
     >
+      {/* Dashboard widget (above wallpaper, behind windows) */}
+      <DashboardWidget />
+
       {/* Sticky notes layer (behind windows) */}
       <StickyNotesLayer />
 
@@ -46,6 +51,9 @@ export function Desktop() {
           </Window>
         );
       })}
+
+      {/* Focus mode overlay */}
+      <FocusMode />
 
       {/* Taskbar */}
       <Taskbar />

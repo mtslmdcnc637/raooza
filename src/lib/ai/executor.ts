@@ -290,6 +290,248 @@ export async function executeAction(action: RaoozaAction): Promise<ActionResult>
             });
             return { ok: true, message: `App aberto: ${action.payload.appId}` };
           }
+          case "enterFocusMode": {
+            useSystemBus.getState().enterFocusMode(action.payload.taskId);
+            useWindowStore.getState().open({
+              appId: "pomodoro",
+              title: "Pomodoro",
+              icon: null as any,
+            });
+            return { ok: true, message: "Modo foco ativado" };
+          }
+          case "exitFocusMode": {
+            useSystemBus.getState().exitFocusMode();
+            return { ok: true, message: "Modo foco desativado" };
+          }
+          case "dailyReview": {
+            // Aggregate today's activity and call AI
+            const todayStr = new Date().toDateString();
+            const [notes, tasks, sessions, events, checkins, timeEntries] = await Promise.all([
+              db.notes.toArray(),
+              db.kanbanTasks.toArray(),
+              db.pomodoroSessions.toArray(),
+              db.calendarEvents.toArray(),
+              db.habitCheckins.toArray(),
+              db.timeEntries.toArray(),
+            ]);
+            const todayNotes = notes.filter((n) => new Date(n.updatedAt).toDateString() === todayStr);
+            const todayCompleted = tasks.filter((t) => new Date(t.updatedAt).toDateString() === todayStr && (t as any).columnId === "done");
+            const todayFocus = sessions.filter((s) => s.type === "focus" && new Date(s.startedAt).toDateString() === todayStr);
+            const todayCheckins = checkins.filter((c) => new Date(c.createdAt).toDateString() === todayStr);
+            const todayEvents = events.filter((e) => new Date(e.startAt).toDateString() === todayStr);
+            const todayTime = timeEntries.filter((t) => new Date(t.startedAt).toDateString() === todayStr);
+
+            const summary = {
+              date: new Date().toLocaleDateString("pt-BR"),
+              notesCreated: todayNotes.length,
+              notesTitles: todayNotes.map((n) => n.title),
+              tasksCompleted: todayCompleted.length,
+              focusSessions: todayFocus.length,
+              focusMinutes: Math.round(todayFocus.reduce((a, s) => a + s.durationSec, 0) / 60),
+              habitCheckins: todayCheckins.length,
+              events: todayEvents.length,
+              timeTrackedMinutes: Math.round(todayTime.reduce((a, t) => a + (t.durationSec ?? 0), 0) / 60),
+            };
+            useSystemBus.getState().notify({
+              app: "system",
+              title: "📋 Daily Review",
+              body: `${summary.notesCreated} notas · ${summary.tasksCompleted} tarefas · ${summary.focusSessions} pomodoros · ${summary.habitCheckins} hábitos`,
+            });
+            return { ok: true, message: "Daily Review gerado", data: summary };
+          }
+          default:
+            return { ok: false, message: `Ação desconhecida: ${action.action}` };
+        }
+      }
+
+      // ============ CALENDAR ============
+      case "calendar": {
+        switch (action.action) {
+          case "createEvent": {
+            const ev = {
+              id: uid("evt"),
+              title: action.payload.title,
+              description: action.payload.description,
+              startAt: action.payload.startAt,
+              endAt: action.payload.endAt,
+              allDay: !!action.payload.allDay,
+              color: action.payload.color ?? "#0078D4",
+              linkedTaskId: action.payload.linkedTaskId,
+              linkedNoteId: action.payload.linkedNoteId,
+              createdAt: now,
+              updatedAt: now,
+            };
+            await db.calendarEvents.add(ev);
+            useSystemBus.getState().triggerRefresh();
+            return { ok: true, message: `Evento criado: "${ev.title}"`, data: ev };
+          }
+          case "updateEvent": {
+            const existing = await db.calendarEvents.get(action.payload.id);
+            if (!existing) return { ok: false, message: "Evento não encontrado" };
+            await db.calendarEvents.update(action.payload.id, {
+              ...existing,
+              ...action.payload,
+              updatedAt: now,
+            });
+            useSystemBus.getState().triggerRefresh();
+            return { ok: true, message: "Evento atualizado" };
+          }
+          case "deleteEvent": {
+            await db.calendarEvents.delete(action.payload.id);
+            useSystemBus.getState().triggerRefresh();
+            return { ok: true, message: "Evento apagado" };
+          }
+          case "list": {
+            let evs = await db.calendarEvents.toArray();
+            if (action.payload.from) evs = evs.filter((e) => e.startAt >= action.payload.from);
+            if (action.payload.to) evs = evs.filter((e) => e.startAt <= action.payload.to);
+            return { ok: true, message: `${evs.length} evento(s)`, data: evs };
+          }
+          default:
+            return { ok: false, message: `Ação desconhecida: ${action.action}` };
+        }
+      }
+
+      // ============ HABITS ============
+      case "habits": {
+        switch (action.action) {
+          case "createHabit": {
+            const h = {
+              id: uid("habit"),
+              title: action.payload.title,
+              cadence: action.payload.cadence ?? "daily",
+              color: action.payload.color ?? "#10B981",
+              targetPerWeek: action.payload.targetPerWeek,
+              createdAt: now,
+            };
+            await db.habits.add(h);
+            useSystemBus.getState().triggerRefresh();
+            return { ok: true, message: `Hábito criado: "${h.title}"`, data: h };
+          }
+          case "checkin": {
+            const habit = await db.habits.get(action.payload.habitId);
+            if (!habit) return { ok: false, message: "Hábito não encontrado" };
+            const date = action.payload.date ?? new Date().toISOString().slice(0, 10);
+            const existing = await db.habitCheckins
+              .where({ habitId: habit.id, date })
+              .first();
+            if (existing) return { ok: true, message: "Já estava marcado hoje" };
+            await db.habitCheckins.add({
+              id: uid("chk"),
+              habitId: habit.id,
+              date,
+              createdAt: now,
+            });
+            useSystemBus.getState().triggerRefresh();
+            return { ok: true, message: `Hábito "${habit.title}" marcado para ${date}` };
+          }
+          case "uncheckin": {
+            const date = action.payload.date ?? new Date().toISOString().slice(0, 10);
+            const existing = await db.habitCheckins
+              .where({ habitId: action.payload.habitId, date })
+              .first();
+            if (existing) {
+              await db.habitCheckins.delete(existing.id);
+              useSystemBus.getState().triggerRefresh();
+              return { ok: true, message: "Check-in removido" };
+            }
+            return { ok: false, message: "Não havia check-in" };
+          }
+          case "list": {
+            const habits = (await db.habits.toArray()).filter((h) => !h.archivedAt);
+            const checkins = await db.habitCheckins.toArray();
+            return {
+              ok: true,
+              message: `${habits.length} hábito(s)`,
+              data: habits.map((h) => ({
+                ...h,
+                streak: computeStreak(h, checkins),
+                checkins: checkins.filter((c) => c.habitId === h.id).length,
+              })),
+            };
+          }
+          default:
+            return { ok: false, message: `Ação desconhecida: ${action.action}` };
+        }
+      }
+
+      // ============ TIME TRACKER ============
+      case "timetracker": {
+        switch (action.action) {
+          case "start": {
+            // Stop any running timer
+            const running = await db.timeEntries.where("endedAt").equals(null as any).first();
+            if (running) {
+              await db.timeEntries.update(running.id, {
+                endedAt: now,
+                durationSec: Math.floor((Date.now() - new Date(running.startedAt).getTime()) / 1000),
+              });
+            }
+            const entry = {
+              id: uid("time"),
+              taskId: action.payload.taskId,
+              description: action.payload.description ?? "",
+              startedAt: now,
+              createdAt: now,
+            };
+            await db.timeEntries.add(entry);
+            useSystemBus.getState().setTrackerActive(true);
+            useSystemBus.getState().triggerRefresh();
+            return { ok: true, message: `Timer iniciado: ${entry.description || "sem descrição"}`, data: entry };
+          }
+          case "stop": {
+            const running = (await db.timeEntries.toArray()).reverse().find((e) => !e.endedAt);
+            if (!running) return { ok: false, message: "Nenhum timer ativo" };
+            await db.timeEntries.update(running.id, {
+              endedAt: now,
+              durationSec: Math.floor((Date.now() - new Date(running.startedAt).getTime()) / 1000),
+            });
+            useSystemBus.getState().setTrackerActive(false);
+            useSystemBus.getState().triggerRefresh();
+            return { ok: true, message: "Timer parado" };
+          }
+          case "list": {
+            const entries = action.payload.taskId
+              ? await db.timeEntries.where("taskId").equals(action.payload.taskId).toArray()
+              : await db.timeEntries.toArray();
+            return { ok: true, message: `${entries.length} entrada(s)`, data: entries.reverse() };
+          }
+          default:
+            return { ok: false, message: `Ação desconhecida: ${action.action}` };
+        }
+      }
+
+      // ============ WIKI ============
+      case "wiki": {
+        switch (action.action) {
+          case "createPage": {
+            const page = {
+              id: uid("wiki"),
+              title: action.payload.title,
+              content: action.payload.content ?? "",
+              tags: action.payload.tags ?? [],
+              createdAt: now,
+              updatedAt: now,
+            };
+            await db.wikiPages.add(page);
+            useSystemBus.getState().triggerRefresh();
+            return { ok: true, message: `Página criada: "${page.title}"`, data: page };
+          }
+          case "updatePage": {
+            const existing = await db.wikiPages.get(action.payload.id);
+            if (!existing) return { ok: false, message: "Página não encontrada" };
+            await db.wikiPages.update(action.payload.id, {
+              ...existing,
+              ...action.payload,
+              updatedAt: now,
+            });
+            useSystemBus.getState().triggerRefresh();
+            return { ok: true, message: "Página atualizada" };
+          }
+          case "list": {
+            const pages = await db.wikiPages.toArray();
+            return { ok: true, message: `${pages.length} página(s)`, data: pages };
+          }
           default:
             return { ok: false, message: `Ação desconhecida: ${action.action}` };
         }
@@ -347,4 +589,59 @@ function parseMarkdownToBlocks(md: string): any[] {
     }
   }
   return blocks;
+}
+
+// Compute current streak for a habit
+export function computeStreak(
+  habit: { id: string; cadence: "daily" | "weekly" },
+  checkins: { habitId: string; date: string }[],
+): number {
+  const habitCheckins = checkins
+    .filter((c) => c.habitId === habit.id)
+    .map((c) => c.date)
+    .sort();
+  if (habitCheckins.length === 0) return 0;
+
+  const today = new Date();
+  const todayStr = today.toISOString().slice(0, 10);
+  const yesterdayStr = new Date(today.getTime() - 86400000).toISOString().slice(0, 10);
+
+  // For daily: streak from today or yesterday backwards
+  if (habit.cadence === "daily") {
+    let streak = 0;
+    let cursor = new Date(today);
+    // If not done today, start from yesterday
+    if (!habitCheckins.includes(todayStr)) {
+      cursor = new Date(today.getTime() - 86400000);
+      if (!habitCheckins.includes(yesterdayStr)) return 0;
+    }
+    while (true) {
+      const ds = cursor.toISOString().slice(0, 10);
+      if (habitCheckins.includes(ds)) {
+        streak++;
+        cursor = new Date(cursor.getTime() - 86400000);
+      } else break;
+    }
+    return streak;
+  }
+
+  // For weekly: count consecutive weeks with at least 1 check-in
+  let streak = 0;
+  let weekCursor = new Date(today);
+  while (true) {
+    const weekStart = new Date(weekCursor);
+    weekStart.setDate(weekCursor.getDate() - weekCursor.getDay());
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 6);
+    const hasCheckin = habitCheckins.some((d) => {
+      const dd = new Date(d + "T00:00:00");
+      return dd >= weekStart && dd <= weekEnd;
+    });
+    if (hasCheckin) {
+      streak++;
+      weekCursor = new Date(weekStart.getTime() - 86400000);
+    } else break;
+    if (streak > 52) break;
+  }
+  return streak;
 }

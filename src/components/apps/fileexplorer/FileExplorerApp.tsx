@@ -4,10 +4,10 @@ import { useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { getDb } from "@/lib/db/db";
 import { useWindowStore } from "@/stores/windowStore";
-import { FileText, StickyNote, Trello, Clock, Search } from "lucide-react";
+import { FileText, StickyNote, Trello, Clock, Search, Calendar, Network, Flame } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-type Kind = "notes" | "docs" | "tasks";
+type Kind = "notes" | "docs" | "tasks" | "events" | "wiki" | "habits";
 
 export function FileExplorerApp() {
   const [kind, setKind] = useState<Kind>("notes");
@@ -16,12 +16,15 @@ export function FileExplorerApp() {
 
   const data = useLiveQuery(async () => {
     const db = getDb();
-    const [notes, docs, tasks] = await Promise.all([
+    const [notes, docs, tasks, events, wiki, habits] = await Promise.all([
       db.notes.toArray(),
       db.editorDocs.toArray(),
       db.kanbanTasks.toArray(),
+      db.calendarEvents.toArray(),
+      db.wikiPages.toArray(),
+      db.habits.toArray(),
     ]);
-    return { notes, docs, tasks };
+    return { notes, docs, tasks, events, wiki, habits };
   }, []);
 
   function openItem(item: any) {
@@ -43,13 +46,38 @@ export function FileExplorerApp() {
         height: 720,
         payload: { docId: item.id },
       });
-    } else {
+    } else if (kind === "wiki") {
+      open({
+        appId: "wiki",
+        title: "Wiki",
+        icon: null,
+        width: 1100,
+        height: 720,
+        payload: { pageId: item.id },
+      });
+    } else if (kind === "tasks") {
       open({
         appId: "kanban",
         title: "Kanban",
         icon: null,
         width: 1000,
         height: 680,
+      });
+    } else if (kind === "events") {
+      open({
+        appId: "calendar",
+        title: "Calendário",
+        icon: null,
+        width: 1000,
+        height: 680,
+      });
+    } else {
+      open({
+        appId: "habits",
+        title: "Hábitos",
+        icon: null,
+        width: 900,
+        height: 640,
       });
     }
   }
@@ -59,7 +87,10 @@ export function FileExplorerApp() {
     let list: any[] = [];
     if (kind === "notes") list = data.notes;
     else if (kind === "docs") list = data.docs;
-    else list = data.tasks;
+    else if (kind === "tasks") list = data.tasks;
+    else if (kind === "events") list = data.events.map((e) => ({ ...e, title: e.title, updatedAt: e.startAt }));
+    else if (kind === "wiki") list = data.wiki;
+    else list = data.habits;
     if (query) {
       const q = query.toLowerCase();
       list = list.filter((x) => (x.title ?? "").toLowerCase().includes(q));
@@ -76,6 +107,9 @@ export function FileExplorerApp() {
           <KindButton kind="notes" current={kind} onClick={setKind} icon={StickyNote} label="Notas" count={data?.notes.length ?? 0} />
           <KindButton kind="docs" current={kind} onClick={setKind} icon={FileText} label="Documentos" count={data?.docs.length ?? 0} />
           <KindButton kind="tasks" current={kind} onClick={setKind} icon={Trello} label="Tarefas" count={data?.tasks.length ?? 0} />
+          <KindButton kind="events" current={kind} onClick={setKind} icon={Calendar} label="Eventos" count={data?.events.length ?? 0} />
+          <KindButton kind="wiki" current={kind} onClick={setKind} icon={Network} label="Wiki" count={data?.wiki.length ?? 0} />
+          <KindButton kind="habits" current={kind} onClick={setKind} icon={Flame} label="Hábitos" count={data?.habits.length ?? 0} />
         </nav>
       </div>
 
@@ -104,6 +138,9 @@ export function FileExplorerApp() {
                   {kind === "notes" && <StickyNote className="w-5 h-5 text-amber-500 flex-shrink-0" />}
                   {kind === "docs" && <FileText className="w-5 h-5 text-blue-500 flex-shrink-0" />}
                   {kind === "tasks" && <Trello className="w-5 h-5 text-emerald-500 flex-shrink-0" />}
+                  {kind === "events" && <Calendar className="w-5 h-5 text-cyan-500 flex-shrink-0" />}
+                  {kind === "wiki" && <Network className="w-5 h-5 text-violet-500 flex-shrink-0" />}
+                  {kind === "habits" && <Flame className="w-5 h-5 text-orange-500 flex-shrink-0" />}
                   <span className="text-sm font-medium truncate flex-1">{item.title || "Sem título"}</span>
                 </div>
                 <div className="text-[10px] text-muted-foreground mt-1 flex items-center gap-1">

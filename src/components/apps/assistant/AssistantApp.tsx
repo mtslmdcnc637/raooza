@@ -7,7 +7,8 @@ import { useSettings } from "@/stores/settingsStore";
 import { useSystemBus } from "@/stores/systemBus";
 import { executeBatch } from "@/lib/ai/executor";
 import { PROVIDERS } from "@/lib/ai/providers";
-import { Send, Sparkles, Loader2, Trash2, Plus, Settings as SettingsIcon, Check, X } from "lucide-react";
+import { useVoiceInput } from "@/lib/voice/useVoiceInput";
+import { Send, Sparkles, Loader2, Trash2, Plus, Settings as SettingsIcon, Check, X, Mic } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { RaoozaBatch } from "@/lib/os/types";
 import { useWindowStore } from "@/stores/windowStore";
@@ -30,6 +31,10 @@ export function AssistantApp() {
   const notify = useSystemBus((s) => s.notify);
   const openSettings = useWindowStore((s) => s.open);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const { listening, supported: voiceSupported, toggle: toggleVoice } = useVoiceInput((text) => {
+    setInput((prev) => (prev ? prev + " " + text : text));
+  });
 
   const activeConv = (conversations ?? []).find((c) => c.id === activeConvId);
 
@@ -338,10 +343,22 @@ export function AssistantApp() {
                   send();
                 }
               }}
-              placeholder="Pergunte ou peça uma ação..."
-              rows={1}
+              placeholder={listening ? "Ouvindo..." : "Pergunte ou peça uma ação..."}
               className="flex-1 bg-transparent outline-none text-sm resize-none max-h-32 placeholder:text-muted-foreground"
             />
+            {voiceSupported && (
+              <button
+                onClick={toggleVoice}
+                className={`w-8 h-8 rounded-md grid place-items-center transition ${
+                  listening
+                    ? "bg-red-500 text-white animate-pulse"
+                    : "hover:bg-muted text-muted-foreground"
+                }`}
+                title={listening ? "Parar" : "Falar"}
+              >
+                <Mic className="w-3.5 h-3.5" />
+              </button>
+            )}
             <button
               onClick={send}
               disabled={!input.trim() || busy}

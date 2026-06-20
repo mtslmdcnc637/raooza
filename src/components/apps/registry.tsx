@@ -9,6 +9,10 @@ import { EditorApp } from "./editor/EditorApp";
 import { AssistantApp } from "./assistant/AssistantApp";
 import { SettingsApp } from "./settings/SettingsApp";
 import { FileExplorerApp } from "./fileexplorer/FileExplorerApp";
+import { CalendarApp } from "./calendar/CalendarApp";
+import { TimeTrackerApp } from "./timetracker/TimeTrackerApp";
+import { HabitsApp } from "./habits/HabitsApp";
+import { WikiApp } from "./wiki/WikiApp";
 
 export interface AppComponentProps {
   win: WindowState;
@@ -22,4 +26,8 @@ export const APP_REGISTRY: Record<string, { component: ComponentType<AppComponen
   assistant: { component: AssistantApp as any },
   settings: { component: SettingsApp as any },
   fileexplorer: { component: FileExplorerApp as any },
+  calendar: { component: CalendarApp as any },
+  timetracker: { component: TimeTrackerApp as any },
+  habits: { component: HabitsApp as any },
+  wiki: { component: WikiApp as any },
 };

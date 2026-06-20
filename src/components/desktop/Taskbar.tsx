@@ -18,6 +18,11 @@ import {
   Battery,
   Search,
   Bell,
+  Calendar,
+  Clock,
+  Flame,
+  Network,
+  Brain,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { StartMenu } from "./StartMenu";
@@ -31,9 +36,25 @@ const ICONS: Record<string, any> = {
   assistant: Sparkles,
   settings: SettingsIcon,
   fileexplorer: Folder,
+  calendar: Calendar,
+  timetracker: Clock,
+  habits: Flame,
+  wiki: Network,
 };
 
-const PINNED = ["notes", "kanban", "pomodoro", "editor", "assistant", "fileexplorer", "settings"];
+const PINNED = [
+  "notes",
+  "kanban",
+  "pomodoro",
+  "editor",
+  "assistant",
+  "calendar",
+  "habits",
+  "timetracker",
+  "wiki",
+  "fileexplorer",
+  "settings",
+];
 
 export function Taskbar() {
   const windows = useWindowStore((s) => s.windows);
@@ -144,7 +165,14 @@ export function Taskbar() {
         </div>
 
         {/* Right: system tray */}
-        <div className="flex items-center gap-1 w-[200px] justify-end">
+        <div className="flex items-center gap-1 w-[220px] justify-end">
+          <button
+            onClick={() => useSystemBus.getState().enterFocusMode()}
+            className="h-9 px-2 rounded-md hover:bg-muted/60 transition grid place-items-center"
+            title="Modo Foco"
+          >
+            <Brain className="w-4 h-4" />
+          </button>
           <button
             onClick={() => setCenterOpen((v) => !v)}
             className="relative h-9 px-2 rounded-md hover:bg-muted/60 transition grid place-items-center"

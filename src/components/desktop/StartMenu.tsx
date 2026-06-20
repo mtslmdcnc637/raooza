@@ -13,6 +13,10 @@ import {
   Search,
   Power,
   X,
+  Calendar,
+  Clock,
+  Flame,
+  Network,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSettings } from "@/stores/settingsStore";
@@ -25,6 +29,10 @@ const ICONS: Record<string, any> = {
   assistant: Sparkles,
   settings: SettingsIcon,
   fileexplorer: Folder,
+  calendar: Calendar,
+  timetracker: Clock,
+  habits: Flame,
+  wiki: Network,
 };
 
 interface Props {

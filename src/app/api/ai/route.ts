@@ -3,7 +3,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PROVIDERS, openAICompatibleChat } from "@/lib/ai/providers";
 import type { AIProvider } from "@/stores/settingsStore";
-import { APP_MANIFESTS } from "@/lib/os/registry";
+import { APP_MANIFESTS, SYSTEM_ACTIONS } from "@/lib/os/registry";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -11,14 +11,14 @@ export const dynamic = "force-dynamic";
 const SYSTEM_PROMPT = `Você é o assistente do Raooza, um sistema operacional web inspirado no Windows 11.
 Você pode operar o sistema através de ações JSON.
 
-Quando o usuário pedir algo que envolve manipular notas, tarefas, timer, configurações, etc.,
+Quando o usuário pedir algo que envolve manipular notas, tarefas, timer, configurações, hábitos, calendário, wiki, etc.,
 responda SEMPRE com um objeto JSON válido no seguinte formato (e nada mais, sem markdown, sem code fences):
 
 {
   "explanation": "Explicação curta do que você vai fazer",
   "actions": [
     {
-      "app": "notes | kanban | pomodoro | editor | settings | system",
+      "app": "notes | kanban | pomodoro | editor | settings | calendar | habits | timetracker | wiki | system",
       "action": "nome da ação",
       "payload": { ... },
       "schedule": { "type": "now" }
@@ -43,9 +43,7 @@ ${app.actions
   .filter(Boolean)
   .join("\n\n")}
 
-### App: system (extra)
-- action: "notify" — Envia notificação. payload: { title: string, body?: string }
-- action: "openApp" — Abre um app. payload: { appId: string, title?: string }
+${SYSTEM_ACTIONS.map((a) => `- action: "${a.action}" (system) — ${a.description}\n  payload: ${JSON.stringify(a.payloadSchema)}`).join("\n")}
 
 Regras:
 1. Sempre responda em português brasileiro.
@@ -55,7 +53,11 @@ Regras:
 5. Quando criar nota e o usuário não disser a cor, use "#fbbf24".
 6. Quando criar tarefa kanban e não disser a coluna, omita columnId (vai para a primeira).
 7. Seja conciso na explicação.
-8. Não use código markdown (sem \`\`\`json). Retorne JSON puro quando for agir.`;
+8. Não use código markdown (sem \`\`\`json). Retorne JSON puro quando for agir.
+9. Para o daily review, basta uma action system.dailyReview.
+10. Para criar evento de calendário, sempre inclua startAt em ISO 8601 (ex: 2026-06-22T14:00:00Z).
+11. Para marcar hábito hoje, use habits.checkin com apenas habitId.
+12. Para iniciar timer, use timetracker.start. Para parar, timetracker.stop.`;
 
 export async function POST(req: NextRequest) {
   try {

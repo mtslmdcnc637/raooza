@@ -77,6 +77,58 @@ export interface ChatMessage {
   createdAt: string;
 }
 
+export interface CalendarEvent {
+  id: string;
+  title: string;
+  description?: string;
+  startAt: string; // ISO 8601
+  endAt?: string;
+  allDay?: boolean;
+  color?: string;
+  linkedTaskId?: string;
+  linkedNoteId?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Habit {
+  id: string;
+  title: string;
+  cadence: "daily" | "weekly";
+  color?: string;
+  targetPerWeek?: number; // for weekly cadence
+  icon?: string;
+  createdAt: string;
+  archivedAt?: string;
+}
+
+export interface HabitCheckin {
+  id: string;
+  habitId: string;
+  date: string; // YYYY-MM-DD
+  note?: string;
+  createdAt: string;
+}
+
+export interface TimeEntry {
+  id: string;
+  taskId?: string; // kanban task
+  description: string;
+  startedAt: string;
+  endedAt?: string;
+  durationSec?: number;
+  createdAt: string;
+}
+
+export interface WikiPage {
+  id: string;
+  title: string;
+  content: string; // markdown with [[wiki links]]
+  tags: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
 export class RaoozaDB extends Dexie {
   notes!: Table<NoteRecord, string>;
   kanbanBoards!: Table<KanbanBoard, string>;
@@ -85,10 +137,15 @@ export class RaoozaDB extends Dexie {
   editorDocs!: Table<EditorDoc, string>;
   conversations!: Table<ChatConversation, string>;
   scheduledActions!: Table<ScheduledAction, string>;
+  calendarEvents!: Table<CalendarEvent, string>;
+  habits!: Table<Habit, string>;
+  habitCheckins!: Table<HabitCheckin, string>;
+  timeEntries!: Table<TimeEntry, string>;
+  wikiPages!: Table<WikiPage, string>;
 
   constructor() {
     super("raooza");
-    this.version(1).stores({
+    this.version(2).stores({
       notes: "id, pinned, updatedAt, *tags",
       kanbanBoards: "id, updatedAt",
       kanbanTasks: "id, boardId, columnId, order, updatedAt, *tags",
@@ -96,6 +153,11 @@ export class RaoozaDB extends Dexie {
       editorDocs: "id, updatedAt",
       conversations: "id, updatedAt",
       scheduledActions: "id, at, executed",
+      calendarEvents: "id, startAt, linkedTaskId, linkedNoteId",
+      habits: "id, cadence, archivedAt",
+      habitCheckins: "id, habitId, date, createdAt",
+      timeEntries: "id, taskId, startedAt, endedAt",
+      wikiPages: "id, updatedAt, *tags",
     });
   }
 }
