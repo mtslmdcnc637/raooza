@@ -129,6 +129,16 @@ export interface WikiPage {
   updatedAt: string;
 }
 
+export interface ProjectImport {
+  id: string;
+  fileName: string;
+  projectName: string;
+  projectDescription?: string;
+  tag: string;
+  items: Array<{ app: string; id: string }>; // all created item IDs by app
+  createdAt: string;
+}
+
 export class RaoozaDB extends Dexie {
   notes!: Table<NoteRecord, string>;
   kanbanBoards!: Table<KanbanBoard, string>;
@@ -142,10 +152,11 @@ export class RaoozaDB extends Dexie {
   habitCheckins!: Table<HabitCheckin, string>;
   timeEntries!: Table<TimeEntry, string>;
   wikiPages!: Table<WikiPage, string>;
+  imports!: Table<ProjectImport, string>;
 
   constructor() {
     super("raooza");
-    this.version(2).stores({
+    this.version(3).stores({
       notes: "id, pinned, updatedAt, *tags",
       kanbanBoards: "id, updatedAt",
       kanbanTasks: "id, boardId, columnId, order, updatedAt, *tags",
@@ -158,6 +169,7 @@ export class RaoozaDB extends Dexie {
       habitCheckins: "id, habitId, date, createdAt",
       timeEntries: "id, taskId, startedAt, endedAt",
       wikiPages: "id, updatedAt, *tags",
+      imports: "id, tag, createdAt",
     });
   }
 }

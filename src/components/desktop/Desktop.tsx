@@ -16,7 +16,9 @@ export function Desktop() {
   const customWallpaper = useSettings((s) => s.customWallpaper);
   const accent = useSettings((s) => s.accent);
   const windows = useWindowStore((s) => s.windows);
+  const open = useWindowStore((s) => s.open);
   const refreshTick = useSystemBus((s) => s.refreshTick);
+  const [dragOver, setDragOver] = useState(false);
   void refreshTick;
 
   const wp = WALLPAPERS.find((w) => w.id === wallpaperId) ?? WALLPAPERS[0];
@@ -25,15 +27,50 @@ export function Desktop() {
   // Inject accent CSS variable
   useEffect(() => {
     document.documentElement.style.setProperty("--accent-color", accent);
-    // Also set --primary to accent for shadcn components
     document.documentElement.style.setProperty("--primary", accent);
   }, [accent]);
+
+  async function handleDrop(e: React.DragEvent) {
+    e.preventDefault();
+    setDragOver(false);
+    const file = e.dataTransfer.files?.[0];
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith(".md")) return;
+    const content = await file.text();
+    open({
+      appId: "importer",
+      title: "Importar MD",
+      icon: null,
+      width: 720,
+      height: 680,
+      payload: { fileName: file.name, content },
+    });
+  }
 
   return (
     <div
       className="fixed inset-0 overflow-hidden"
       style={{ background: bg }}
+      onDragOver={(e) => {
+        e.preventDefault();
+        if (e.dataTransfer.types.includes("Files")) setDragOver(true);
+      }}
+      onDragLeave={(e) => {
+        if (e.target === e.currentTarget) setDragOver(false);
+      }}
+      onDrop={handleDrop}
     >
+      {/* Drag overlay */}
+      {dragOver && (
+        <div className="fixed inset-0 z-[9400] pointer-events-none grid place-items-center bg-primary/10 backdrop-blur-sm border-4 border-dashed border-primary/60 m-4 rounded-2xl">
+          <div className="text-center">
+            <div className="text-4xl mb-2">📄</div>
+            <div className="text-lg font-semibold">Solte o arquivo .md aqui</div>
+            <div className="text-sm text-muted-foreground mt-1">A IA vai configurar o ambiente para o projeto</div>
+          </div>
+        </div>
+      )}
+
       {/* Dashboard widget (above wallpaper, behind windows) */}
       <DashboardWidget />
 

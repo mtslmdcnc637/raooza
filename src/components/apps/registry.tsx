@@ -13,6 +13,7 @@ import { CalendarApp } from "./calendar/CalendarApp";
 import { TimeTrackerApp } from "./timetracker/TimeTrackerApp";
 import { HabitsApp } from "./habits/HabitsApp";
 import { WikiApp } from "./wiki/WikiApp";
+import { MDImporterApp } from "./importer/MDImporterApp";
 
 export interface AppComponentProps {
   win: WindowState;
@@ -30,4 +31,5 @@ export const APP_REGISTRY: Record<string, { component: ComponentType<AppComponen
   timetracker: { component: TimeTrackerApp as any },
   habits: { component: HabitsApp as any },
   wiki: { component: WikiApp as any },
+  importer: { component: MDImporterApp as any },
 };

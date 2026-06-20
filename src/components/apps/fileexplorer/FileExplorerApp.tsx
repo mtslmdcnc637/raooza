@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { getDb } from "@/lib/db/db";
 import { useWindowStore } from "@/stores/windowStore";
-import { FileText, StickyNote, Trello, Clock, Search, Calendar, Network, Flame } from "lucide-react";
+import { FileText, StickyNote, Trello, Clock, Search, Calendar, Network, Flame, Upload } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type Kind = "notes" | "docs" | "tasks" | "events" | "wiki" | "habits";
@@ -115,8 +115,8 @@ export function FileExplorerApp() {
 
       {/* Content */}
       <div className="flex-1 flex flex-col">
-        <div className="p-3 border-b border-border/40">
-          <div className="flex items-center gap-2 h-9 px-3 rounded-md bg-muted/40 border border-border/60">
+        <div className="p-3 border-b border-border/40 flex items-center gap-2">
+          <div className="flex items-center gap-2 h-9 px-3 rounded-md bg-muted/40 border border-border/60 flex-1">
             <Search className="w-4 h-4 text-muted-foreground" />
             <input
               value={query}
@@ -125,6 +125,21 @@ export function FileExplorerApp() {
               className="flex-1 bg-transparent outline-none text-sm"
             />
           </div>
+          <button
+            onClick={() => open({
+              appId: "importer",
+              title: "Importar MD",
+              icon: null,
+              width: 720,
+              height: 680,
+            })}
+            className="h-9 px-3 rounded-md text-white text-xs font-medium flex items-center gap-1.5 flex-shrink-0"
+            style={{ background: "var(--accent-color)" }}
+            title="Importar arquivo .md"
+          >
+            <Upload className="w-3.5 h-3.5" />
+            Importar MD
+          </button>
         </div>
         <div className="flex-1 overflow-y-auto p-4">
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">

@@ -378,6 +378,18 @@ export const APP_MANIFESTS: AppManifest[] = [
       },
     ],
   },
+  {
+    id: "importer",
+    name: "Importar MD",
+    description: "Importa um arquivo markdown e configura o ambiente",
+    icon: null as any,
+    defaultSize: { width: 720, height: 680 },
+    minSize: { width: 500, height: 500 },
+    resizable: true,
+    pinnable: false,
+    category: "system",
+    actions: [],
+  },
 ];
 
 // System-level actions (not bound to a single app)

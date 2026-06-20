@@ -17,6 +17,7 @@ import {
   Clock,
   Flame,
   Network,
+  Upload,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSettings } from "@/stores/settingsStore";
@@ -33,6 +34,7 @@ const ICONS: Record<string, any> = {
   timetracker: Clock,
   habits: Flame,
   wiki: Network,
+  importer: Upload,
 };
 
 interface Props {
