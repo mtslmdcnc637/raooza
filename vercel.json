@@ -3,10 +3,5 @@
   "framework": "nextjs",
   "buildCommand": "bun run build",
   "installCommand": "bun install",
-  "regions": ["gru1"],
-  "functions": {
-    "api/ai/route.ts": { "maxDuration": 60 },
-    "api/import-md/route.ts": { "maxDuration": 300 },
-    "api/myday/route.ts": { "maxDuration": 60 }
-  }
+  "regions": ["gru1"]
 }
