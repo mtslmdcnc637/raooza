@@ -1,0 +1,29 @@
+* text=auto
+
+# JavaScript / TypeScript
+*.js text
+*.ts text
+*.tsx text
+*.jsx text
+*.mjs text
+*.cjs text
+
+# Style
+*.css text
+*.json text
+*.html text
+
+# Docs
+*.md text
+*.yml text
+*.yaml text
+
+# Images
+*.png binary
+*.jpg binary
+*.svg binary
+*.ico binary
+
+# Binaries
+*.lock binary
+*.db binary
