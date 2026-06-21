@@ -351,7 +351,7 @@ export function CommandPalette({ open, onClose }: Props) {
   let runningIdx = -1;
 
   return (
-    <div className="fixed inset-0 z-[9600] flex items-start justify-center pt-[15vh] px-4" onClick={onClose}>
+    <div className="fixed inset-0 z-[9600] flex items-start justify-center pt-[10vh] sm:pt-[15vh] px-3 sm:px-4" onClick={onClose}>
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
       <div
         className="relative w-full max-w-xl rounded-2xl border border-border/60 bg-card/95 backdrop-blur-2xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150"

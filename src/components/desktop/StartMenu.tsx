@@ -22,6 +22,7 @@ import {
   LayoutTemplate,
   Zap,
   Video,
+  MessageCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSettings } from "@/stores/settingsStore";
@@ -43,6 +44,7 @@ const ICONS: Record<string, any> = {
   templates: LayoutTemplate,
   snippets: Zap,
   video: Video,
+  messages: MessageCircle,
 };
 
 interface Props {
@@ -64,7 +66,7 @@ export function StartMenu({ onClose, onOpenApp }: Props) {
     <>
       <div className="fixed inset-0 z-[8999]" onClick={onClose} />
       <div
-        className="fixed bottom-14 left-1/2 -translate-x-1/2 z-[9000] w-[640px] max-w-[92vw] rounded-2xl border border-border/60 bg-card/85 backdrop-blur-2xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-200"
+        className="fixed bottom-14 left-1/2 -translate-x-1/2 z-[9000] w-[calc(100vw-1rem)] max-w-[640px] rounded-2xl border border-border/60 bg-card/85 backdrop-blur-2xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-200"
         style={{ maxHeight: "70vh" }}
       >
         {/* Search */}
@@ -89,22 +91,22 @@ export function StartMenu({ onClose, onOpenApp }: Props) {
           <div className="text-xs text-muted-foreground font-medium mb-3 px-1">
             {query ? "Resultados" : "Todos os aplicativos"}
           </div>
-          <div className="grid grid-cols-4 gap-2">
+          <div className="grid grid-cols-4 sm:grid-cols-4 gap-2">
             {filtered.map((m) => {
               const Icon = ICONS[m.id] ?? Sparkles;
               return (
                 <button
                   key={m.id}
                   onClick={() => onOpenApp(m.id)}
-                  className="flex flex-col items-center gap-2 p-3 rounded-lg hover:bg-muted/60 transition group"
+                  className="flex flex-col items-center gap-2 p-2 sm:p-3 rounded-lg hover:bg-muted/60 transition group"
                 >
                   <div
-                    className="w-12 h-12 rounded-xl grid place-items-center group-hover:scale-105 transition"
+                    className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl grid place-items-center group-hover:scale-105 transition"
                     style={{ background: `${accent}20`, color: accent }}
                   >
-                    <Icon className="w-6 h-6" />
+                    <Icon className="w-5 h-5 sm:w-6 sm:h-6" />
                   </div>
-                  <span className="text-xs text-center font-medium">{m.name}</span>
+                  <span className="text-[10px] sm:text-xs text-center font-medium truncate max-w-full">{m.name}</span>
                 </button>
               );
             })}

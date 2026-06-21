@@ -83,7 +83,7 @@ export function DashboardWidget() {
 
   return (
     <div
-      className="absolute pointer-events-auto w-72 rounded-2xl bg-card/80 backdrop-blur-2xl border border-border/60 shadow-2xl overflow-hidden"
+      className="hidden sm:block absolute pointer-events-auto w-72 rounded-2xl bg-card/80 backdrop-blur-2xl border border-border/60 shadow-2xl overflow-hidden"
       style={{ left: pos.x, top: pos.y, zIndex: 2 }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}

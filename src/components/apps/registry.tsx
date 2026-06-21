@@ -18,6 +18,7 @@ import { MyDayApp } from "./myday/MyDayApp";
 import { TemplatesApp } from "./templates/TemplatesApp";
 import { SnippetsApp } from "./snippets/SnippetsApp";
 import { VideoPlannerApp } from "./video/VideoPlannerApp";
+import { MessagesApp } from "./messages/MessagesApp";
 
 export interface AppComponentProps {
   win: WindowState;
@@ -40,4 +41,5 @@ export const APP_REGISTRY: Record<string, { component: ComponentType<AppComponen
   templates: { component: TemplatesApp as any },
   snippets: { component: SnippetsApp as any },
   video: { component: VideoPlannerApp as any },
+  messages: { component: MessagesApp as any },
 };

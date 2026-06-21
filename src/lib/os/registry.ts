@@ -438,6 +438,18 @@ export const APP_MANIFESTS: AppManifest[] = [
     category: "productivity",
     actions: [],
   },
+  {
+    id: "messages",
+    name: "Mensagens",
+    description: "Mensagens E2E criptografadas com contatos por ID",
+    icon: null as any,
+    defaultSize: { width: 460, height: 680 },
+    minSize: { width: 320, height: 480 },
+    resizable: true,
+    pinnable: true,
+    category: "productivity",
+    actions: [],
+  },
 ];
 
 // System-level actions (not bound to a single app)

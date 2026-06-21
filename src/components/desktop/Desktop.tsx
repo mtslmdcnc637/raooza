@@ -9,6 +9,7 @@ import { StickyNotesLayer } from "./StickyNotesLayer";
 import { DashboardWidget } from "./dashboard/DashboardWidget";
 import { FocusMode } from "./focusmode/FocusMode";
 import { CommandPalette } from "./commandpalette/CommandPalette";
+import { PinnedMessageOverlay } from "./PinnedMessageOverlay";
 import { useSystemBus } from "@/stores/systemBus";
 import { useSnippetsExpansion } from "@/lib/snippets/useSnippetsExpansion";
 import { APP_REGISTRY } from "@/components/apps/registry";
@@ -93,6 +94,9 @@ export function Desktop() {
 
       {/* Command palette */}
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
+
+      {/* Pinned messages overlay (sticky notes from messaging app) */}
+      <PinnedMessageOverlay />
 
       {/* Dashboard widget (above wallpaper, behind windows) */}
       <DashboardWidget />

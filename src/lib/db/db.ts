@@ -203,6 +203,28 @@ export interface VideoNote {
   updatedAt: string;
 }
 
+// E2E Messaging — all ciphertexts, never plaintext keys leave the device
+export interface Peer {
+  id: string; // peer's public ID (short hash of their pubkey)
+  displayName: string; // local name you gave them (only on your device)
+  publicKey: string; // their pubkey (base64) — needed to encrypt to them
+  addedAt: string;
+  lastMessageAt?: string;
+}
+
+export interface Message {
+  id: string;
+  peerId: string; // who sent or received
+  direction: "in" | "out";
+  // Plaintext (decrypted locally). Stored only on the device of the owner.
+  plaintext: string;
+  createdAt: string;
+  read: boolean;
+  // Optional: pinned as a note in the center of the screen
+  pinned: boolean;
+  pinnedAt?: string;
+}
+
 export class RaoozaDB extends Dexie {
   notes!: Table<NoteRecord, string>;
   kanbanBoards!: Table<KanbanBoard, string>;
@@ -222,10 +244,12 @@ export class RaoozaDB extends Dexie {
   videoProjects!: Table<VideoProject, string>;
   videoPrompts!: Table<VideoPrompt, string>;
   videoNotes!: Table<VideoNote, string>;
+  peers!: Table<Peer, string>;
+  messages!: Table<Message, string>;
 
   constructor() {
     super("raooza");
-    this.version(6).stores({
+    this.version(7).stores({
       notes: "id, pinned, updatedAt, *tags",
       kanbanBoards: "id, updatedAt",
       kanbanTasks: "id, boardId, columnId, order, updatedAt, *tags",
@@ -244,6 +268,8 @@ export class RaoozaDB extends Dexie {
       videoProjects: "id, status, platform, updatedAt",
       videoPrompts: "id, projectId, type, status, rating, updatedAt, *tags",
       videoNotes: "id, projectId, type, order, updatedAt",
+      peers: "id, displayName, addedAt",
+      messages: "id, peerId, direction, createdAt, read, pinned",
     });
   }
 }

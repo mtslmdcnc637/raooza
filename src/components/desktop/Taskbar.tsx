@@ -27,6 +27,7 @@ import {
   LayoutTemplate,
   Zap,
   Video,
+  MessageCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { StartMenu } from "./StartMenu";
@@ -49,10 +50,12 @@ const ICONS: Record<string, any> = {
   templates: LayoutTemplate,
   snippets: Zap,
   video: Video,
+  messages: MessageCircle,
 };
 
 const PINNED = [
   "myday",
+  "messages",
   "video",
   "notes",
   "kanban",
@@ -118,21 +121,21 @@ export function Taskbar() {
     <>
       {startOpen && <StartMenu onClose={() => setStartOpen(false)} onOpenApp={openApp} />}
 
-      <div className="fixed bottom-0 left-0 right-0 h-12 z-[9000] px-2 flex items-center justify-between bg-card/70 backdrop-blur-2xl border-t border-border/60">
-        {/* Left: start + widgets */}
-        <div className="flex items-center gap-1 w-[200px]">
+      <div className="fixed bottom-0 left-0 right-0 h-12 z-[9000] px-1.5 flex items-center gap-1 sm:gap-2 bg-card/70 backdrop-blur-2xl border-t border-border/60">
+        {/* Left: start + widgets (hidden on small screens, shown on md+) */}
+        <div className="hidden md:flex items-center gap-1 w-[200px] flex-shrink-0">
           <button
             onClick={() => useSystemBus.getState().setPaletteOpen(true)}
-            className="h-9 px-3 rounded-md flex items-center gap-2 hover:bg-muted/60 transition text-muted-foreground text-xs"
+            className="h-9 px-2 sm:px-3 rounded-md flex items-center gap-2 hover:bg-muted/60 transition text-muted-foreground text-xs"
             title="Buscar (Ctrl+K)"
           >
             <Search className="w-3.5 h-3.5" />
-            <span className="hidden md:inline">Buscar</span>
+            <span className="hidden lg:inline">Buscar</span>
           </button>
           <button
             onClick={() => setStartOpen((v) => !v)}
             className={cn(
-              "h-9 px-3 rounded-md flex items-center gap-2 hover:bg-muted/60 transition",
+              "h-9 px-2 sm:px-3 rounded-md flex items-center gap-2 hover:bg-muted/60 transition",
               startOpen && "bg-muted/60",
             )}
             title="Iniciar"
@@ -146,8 +149,17 @@ export function Taskbar() {
           </button>
         </div>
 
-        {/* Center: app icons */}
-        <div className="flex items-center gap-1">
+        {/* Mobile search button (visible only on small screens) */}
+        <button
+          onClick={() => useSystemBus.getState().setPaletteOpen(true)}
+          className="md:hidden h-9 w-9 grid place-items-center rounded-md hover:bg-muted/60 transition text-muted-foreground flex-shrink-0"
+          title="Buscar (Ctrl+K)"
+        >
+          <Search className="w-4 h-4" />
+        </button>
+
+        {/* Center: app icons (scrollable on mobile) */}
+        <div className="flex items-center gap-0.5 sm:gap-1 flex-1 overflow-x-auto scrollbar-hide justify-start md:justify-center">
           {PINNED.map((appId) => {
             const Icon = ICONS[appId] ?? Sparkles;
             const wins = windows.filter((w) => w.appId === appId);
@@ -165,12 +177,12 @@ export function Taskbar() {
                   }
                 }}
                 className={cn(
-                  "relative h-9 w-9 grid place-items-center rounded-md hover:bg-muted/60 transition group",
+                  "relative h-9 w-9 sm:w-9 grid place-items-center rounded-md hover:bg-muted/60 transition group flex-shrink-0",
                   isActive && "bg-muted/60",
                 )}
                 title={APP_MANIFESTS.find((x) => x.id === appId)?.name}
               >
-                <Icon className="w-5 h-5 text-foreground" />
+                <Icon className="w-4 h-4 sm:w-5 sm:h-5 text-foreground" />
                 {isRunning && (
                   <span
                     className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 h-1 rounded-full transition-all"
@@ -185,18 +197,18 @@ export function Taskbar() {
           })}
         </div>
 
-        {/* Right: system tray */}
-        <div className="flex items-center gap-1 w-[220px] justify-end">
+        {/* Right: system tray (compact on mobile) */}
+        <div className="flex items-center gap-0.5 sm:gap-1 flex-shrink-0">
           <button
             onClick={() => useSystemBus.getState().enterFocusMode()}
-            className="h-9 px-2 rounded-md hover:bg-muted/60 transition grid place-items-center"
+            className="hidden sm:grid h-9 w-9 place-items-center rounded-md hover:bg-muted/60 transition"
             title="Modo Foco"
           >
             <Brain className="w-4 h-4" />
           </button>
           <button
             onClick={() => setCenterOpen((v) => !v)}
-            className="relative h-9 px-2 rounded-md hover:bg-muted/60 transition grid place-items-center"
+            className="relative h-9 w-9 grid place-items-center rounded-md hover:bg-muted/60 transition"
             title="Notificações"
           >
             <Bell className="w-4 h-4" />
@@ -211,19 +223,19 @@ export function Taskbar() {
           </button>
           <button
             onClick={toggleMode}
-            className="h-9 px-2 rounded-md hover:bg-muted/60 transition text-xs"
+            className="h-9 w-9 grid place-items-center rounded-md hover:bg-muted/60 transition text-xs"
             title="Tema"
           >
             {mode === "dark" ? "🌙" : "☀️"}
           </button>
-          <div className="flex items-center gap-2 h-9 px-2 rounded-md hover:bg-muted/60 transition cursor-default text-xs">
+          <div className="hidden sm:flex items-center gap-2 h-9 px-2 rounded-md hover:bg-muted/60 transition cursor-default text-xs">
             <Wifi className="w-3.5 h-3.5" />
             <Volume2 className="w-3.5 h-3.5" />
             <Battery className="w-3.5 h-3.5" />
           </div>
-          <div className="flex flex-col items-end h-9 px-2 rounded-md hover:bg-muted/60 transition cursor-default justify-center text-xs leading-tight">
+          <div className="flex flex-col items-end h-9 px-1 sm:px-2 rounded-md hover:bg-muted/60 transition cursor-default justify-center text-xs leading-tight">
             <span className="tabular-nums">{time}</span>
-            <span className="text-[10px] text-muted-foreground tabular-nums">{date}</span>
+            <span className="text-[10px] text-muted-foreground tabular-nums hidden sm:block">{date}</span>
           </div>
         </div>
       </div>
