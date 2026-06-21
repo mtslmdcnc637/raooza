@@ -3,11 +3,10 @@
   "framework": "nextjs",
   "buildCommand": "bun run build",
   "installCommand": "bun install",
-  "outputDirectory": ".next",
   "regions": ["gru1"],
   "functions": {
-    "/api/ai": { "maxDuration": 60 },
-    "/api/import-md": { "maxDuration": 300 },
-    "/api/myday": { "maxDuration": 60 }
+    "api/ai/route.ts": { "maxDuration": 60 },
+    "api/import-md/route.ts": { "maxDuration": 300 },
+    "api/myday/route.ts": { "maxDuration": 60 }
   }
 }
