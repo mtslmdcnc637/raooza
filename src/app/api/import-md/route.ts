@@ -1,5 +1,5 @@
 // Raooza OS - Markdown Import API Route
-// Analyzes a markdown file using AI and returns a structured action batch
+// Analyzes a markdown file using AI and returns a structured action batch.
 
 import { NextRequest, NextResponse } from "next/server";
 import { PROVIDERS, openAICompatibleChat } from "@/lib/ai/providers";
@@ -7,82 +7,54 @@ import type { AIProvider } from "@/stores/settingsStore";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 300; // 5 minutes
 
-const MAX_CONTENT_CHARS = 30000; // ~30k chars to fit context window
+const MAX_CONTENT_CHARS = 25000; // trimmed to fit context safely
 
-const IMPORT_PROMPT = `Você está analisando um arquivo markdown (.md) para configurar um workspace de projeto no Raooza OS.
+const IMPORT_PROMPT = `Você é um assistente que analisa um arquivo markdown (.md) e extrai a estrutura de projeto para configurar um workspace no Raooza OS.
 
-Com base no conteúdo do markdown, extraia a estrutura do projeto e retorne um JSON com as ações necessárias para configurar o ambiente.
+RETORNE APENAS JSON VÁLIDO. Sem markdown. Sem code fences. Sem texto antes ou depois. Sem comentários. A resposta inteira deve ser parseable por JSON.parse().
 
-Formato de resposta (JSON PURO, sem markdown, sem code fences):
+Formato EXATO:
 
 {
-  "projectName": "Nome do projeto (do primeiro H1 ou do nome do arquivo)",
-  "projectDescription": "1-2 frases descrevendo o projeto",
-  "tag": "slug-do-projeto (sem espaços, sem acentos, sem #)",
+  "projectName": "string (do H1 ou nome do arquivo, sem extensão)",
+  "projectDescription": "string curta 1-2 frases",
+  "tag": "slug sem espaços/acentos/símbolos",
   "actions": [
-    // 1 wiki page com o conteúdo completo do MD (preservando markdown e convertendo referências internas em [[links]])
     {
-      "app": "wiki",
-      "action": "createPage",
-      "payload": {
-        "title": "Nome do projeto",
-        "content": "conteúdo completo do MD, com [[links]] onde fizer sentido",
-        "tags": ["#tag-do-projeto#"]
-      }
-    },
-    // Tarefas kanban extraídas de: TODOs, checklists (- [ ]), seções "Próximos Passos", "Roadmap", "Backlog"
-    {
-      "app": "kanban",
-      "action": "createTask",
-      "payload": {
-        "title": "título curto da tarefa",
-        "description": "detalhe se houver",
-        "tags": ["#tag-do-projeto#"],
-        "dueDate": "ISO 8601 se houver data mencionada, senão omitir"
-      }
-    },
-    // Notas inteligentes com resumos das seções principais (máx 5 notas)
-    {
-      "app": "notes",
-      "action": "create",
-      "payload": {
-        "title": "Título da seção",
-        "content": "Resumo da seção em markdown",
-        "color": "#fbbf24",
-        "tags": ["#tag-do-projeto#"]
-      }
-    },
-    // Eventos de calendário se houver datas explícitas (reuniões, prazos, releases)
-    {
-      "app": "calendar",
-      "action": "createEvent",
-      "payload": {
-        "title": "Nome do evento",
-        "startAt": "ISO 8601",
-        "allDay": true,
-        "color": "#0078D4"
-      }
+      "app": "wiki" | "kanban" | "notes" | "calendar",
+      "action": "createPage" | "createTask" | "create" | "createEvent",
+      "payload": { "title": "...", "content": "...", "tags": ["#tag#"], ... }
     }
   ]
 }
 
-REGRAS:
-1. Sempre responda em português brasileiro.
-2. Sempre inclua a tag do projeto em TODOS os payloads que aceitam tags (notes, kanban, wiki).
-3. SEMPRE crie exatamente 1 wiki page com o conteúdo completo do MD.
-4. Extraia no MÁXIMO 10 tarefas kanban (as mais importantes).
-5. Extraia no MÁXIMO 5 notas (apenas seções significativas, não crie notas triviais).
-6. Crie eventos de calendário APENAS se houver datas explícitas no MD (ex: "reunião dia 15/07", "release em 2026-08-01").
-7. Converta referências internas do MD para [[links wiki]] quando fizer sentido.
-8. A tag deve ser um slug limpo: sem espaços, sem acentos, sem caracteres especiais.
-9. NÃO invente informações — apenas extraia do que está no MD.
-10. Se o MD for muito curto ou vazio, crie apenas a wiki page com o conteúdo disponível.
-11. Retorne SOMENTE o JSON, sem texto adicional, sem markdown, sem \`\`\`json.
+Mapeamento de app → action:
+- wiki → "createPage" (sempre crie EXATAMENTE 1 página com o conteúdo completo do MD)
+- kanban → "createTask" (extraia de TODOs, checklists - [ ], seções "Próximos Passos", "Roadmap", "Backlog" — máx 10)
+- notes → "create" (resumos das seções principais — máx 5, com color "#fbbf24")
+- calendar → "createEvent" (APENAS se houver datas explícitas, com startAt ISO 8601, allDay true, color "#0078D4")
 
-Importante: no campo "tags", use o formato ["#tag-do-projeto#"] (com # no início e fim). Exemplo: se a tag for "mrcine", use ["#mrcine#"].`;
+Payloads:
+- wiki.createPage: { title, content, tags: ["#tag#"] }
+- kanban.createTask: { title, description?, tags: ["#tag#"], dueDate? }
+- notes.create: { title, content, color: "#fbbf24", tags: ["#tag#"] }
+- calendar.createEvent: { title, startAt, allDay: true, color: "#0078D4" }
+
+REGRAS:
+1. Tag deve ser slug limpo: sem espaços, sem acentos, sem #. Ex: "Mrcine" → "mrcine", "Meu Projeto" → "meuprojeto".
+2. Todas as tags em payloads devem ser "#slug#" (com # no início e fim).
+3. Sempre crie 1 wiki page com conteúdo COMPLETO do MD (pode truncar se enorme, mas preservar estrutura).
+4. Máximo 10 tarefas kanban, 5 notas, 10 eventos.
+5. Não invente dados — só extraia do MD.
+6. Se MD for vazio/curto, crie só a wiki page.
+7. Não inclua "schedule" nos actions.
+8. Converta referências internas do MD em [[wiki links]] quando fizer sentido.
+9. IMPORTANTE: resposta deve começar com { e terminar com }. Nada mais.`;
 
 export async function POST(req: NextRequest) {
+  const startTime = Date.now();
   try {
     const body = await req.json();
     const fileName = body.fileName as string;
@@ -94,7 +66,6 @@ export async function POST(req: NextRequest) {
     if (!fileName || !content) {
       return NextResponse.json({ error: "fileName e content são obrigatórios" }, { status: 400 });
     }
-
     if (!providerId || !PROVIDERS[providerId]) {
       return NextResponse.json({ error: "Provider inválido" }, { status: 400 });
     }
@@ -108,90 +79,129 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Truncate content if too long
+    // Truncate content to fit context window
     const truncated = content.length > MAX_CONTENT_CHARS
       ? content.slice(0, MAX_CONTENT_CHARS) + "\n\n[... conteúdo truncado ...]"
       : content;
 
-    const userMessage = `Arquivo: ${fileName}\n\nConteúdo:\n\n${truncated}`;
+    const userMessage = `Arquivo: ${fileName}\n\nConteúdo do markdown:\n\n${truncated}`;
 
     const messages = [
       { role: "system" as const, content: IMPORT_PROMPT },
       { role: "user" as const, content: userMessage },
     ];
 
-    let responseText: string;
+    // Call AI with retry (max 2 attempts)
+    let responseText = "";
+    let lastError: any = null;
 
-    if (providerId === "glm" && !apiKey) {
+    for (let attempt = 0; attempt < 2; attempt++) {
       try {
-        const ZAIMod = await import("z-ai-web-dev-sdk");
-        const ZAI = (ZAIMod as any).default || (ZAIMod as any).ZAI || ZAIMod;
-        const zai = await ZAI.create();
-        const res = await zai.chat.completions.create({
-          model: model || provider.defaultModel,
-          messages,
-          temperature: 0.2,
-        });
-        responseText = res.choices?.[0]?.message?.content ?? "";
+        if (providerId === "glm" && !apiKey) {
+          const ZAIMod = await import("z-ai-web-dev-sdk");
+          const ZAI = (ZAIMod as any).default || (ZAIMod as any).ZAI || ZAIMod;
+          const zai = await ZAI.create();
+          const res = await zai.chat.completions.create({
+            model: model || provider.defaultModel,
+            messages,
+            temperature: 0.2,
+          });
+          responseText = res.choices?.[0]?.message?.content ?? "";
+        } else {
+          responseText = await openAICompatibleChat(
+            provider.baseUrl,
+            apiKey,
+            model || provider.defaultModel,
+            messages,
+          );
+        }
+
+        // Try to parse — if it works, we're done
+        const parsed = tryParseJSON(responseText);
+        if (parsed && Array.isArray(parsed.actions)) {
+          return NextResponse.json(normalizeResponse(parsed, fileName));
+        }
+        lastError = new Error("IA não retornou JSON válido");
+        // On second attempt failure, fall through to error
       } catch (e: any) {
-        return NextResponse.json(
-          { error: `GLM SDK erro: ${e?.message ?? String(e)}. Configure uma API key própria em Configurações > IA.` },
-          { status: 500 },
-        );
-      }
-    } else {
-      responseText = await openAICompatibleChat(
-        provider.baseUrl,
-        apiKey,
-        model || provider.defaultModel,
-        messages,
-      );
-    }
-
-    // Try to parse JSON from response
-    let parsed: any = null;
-    let cleaned = responseText.trim();
-    // Strip markdown code fences
-    if (cleaned.startsWith("```")) {
-      cleaned = cleaned.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "");
-    }
-    try {
-      parsed = JSON.parse(cleaned);
-    } catch {
-      // Try to extract first { ... }
-      const match = responseText.match(/\{[\s\S]*\}/);
-      if (match) {
-        try {
-          parsed = JSON.parse(match[0]);
-        } catch {}
+        lastError = e;
+        // Wait a bit before retry
+        if (attempt === 0) await new Promise((r) => setTimeout(r, 1000));
       }
     }
 
-    if (!parsed || !parsed.actions || !Array.isArray(parsed.actions)) {
-      return NextResponse.json(
-        { error: "IA não retornou um JSON válido. Tente novamente.", raw: responseText.slice(0, 500) },
-        { status: 422 },
-      );
-    }
-
-    // Normalize tag format: ensure # prefix and # suffix
-    const tag = (parsed.tag ?? slugify(fileName)).replace(/#/g, "");
-    parsed.tag = tag;
-    parsed.actions = parsed.actions.map((a: any) => {
-      if (a.payload && Array.isArray(a.payload.tags)) {
-        a.payload.tags = a.payload.tags.map((t: string) => {
-          const clean = (t || "").replace(/^#/, "").replace(/#$/, "");
-          return clean === tag ? `#${tag}#` : t;
-        });
-      }
-      return a;
+    // All attempts failed — return informative error
+    console.error("[/api/import-md] All attempts failed", {
+      error: lastError?.message,
+      duration: Date.now() - startTime,
+      responsePreview: responseText.slice(0, 300),
     });
 
-    return NextResponse.json(parsed);
+    return NextResponse.json(
+      {
+        error: "A IA demorou muito ou retornou resposta inválida. Tente novamente, ou reduza o tamanho do arquivo.",
+        details: lastError?.message ?? "Unknown error",
+      },
+      { status: 504 },
+    );
   } catch (e: any) {
-    console.error("[/api/import-md]", e);
-    return NextResponse.json({ error: e?.message ?? String(e) }, { status: 500 });
+    console.error("[/api/import-md] Fatal", e);
+    return NextResponse.json(
+      { error: e?.message ?? "Erro interno do servidor" },
+      { status: 500 },
+    );
   }
+}
+
+function tryParseJSON(text: string): any | null {
+  if (!text) return null;
+  let s = text.trim();
+
+  // Strip markdown code fences
+  if (s.startsWith("```")) {
+    s = s.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "");
+  }
+
+  // Try direct parse
+  try {
+    return JSON.parse(s);
+  } catch {}
+
+  // Try to extract first { ... } block (greedy)
+  const firstBrace = s.indexOf("{");
+  const lastBrace = s.lastIndexOf("}");
+  if (firstBrace !== -1 && lastBrace > firstBrace) {
+    const candidate = s.slice(firstBrace, lastBrace + 1);
+    try {
+      return JSON.parse(candidate);
+    } catch {}
+    // Try to fix common issues: trailing commas
+    try {
+      const fixed = candidate.replace(/,(\s*[}\]])/g, "$1");
+      return JSON.parse(fixed);
+    } catch {}
+  }
+
+  return null;
+}
+
+function normalizeResponse(parsed: any, fileName: string) {
+  const tag = (parsed.tag ?? slugify(fileName)).replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
+  parsed.tag = tag;
+  if (!Array.isArray(parsed.actions)) parsed.actions = [];
+  parsed.actions = parsed.actions.map((a: any) => {
+    if (a.payload && Array.isArray(a.payload.tags)) {
+      a.payload.tags = a.payload.tags.map((t: string) => {
+        const clean = String(t || "").replace(/^#/, "").replace(/#$/, "");
+        return clean === tag ? `#${tag}#` : t;
+      });
+    }
+    return a;
+  });
+  if (!parsed.projectName) {
+    parsed.projectName = fileName.replace(/\.md$/i, "");
+  }
+  return parsed;
 }
 
 function slugify(s: string): string {

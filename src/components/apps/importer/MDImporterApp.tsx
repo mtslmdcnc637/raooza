@@ -87,6 +87,10 @@ export function MDImporterApp({ win }: { win: WindowState }) {
       const apiKey = settingsState.apiKeys[provider];
       const model = settingsState.defaultModel[provider];
 
+      // Set a client-side timeout of 4 minutes
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 4 * 60 * 1000);
+
       const res = await fetch("/api/import-md", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -97,10 +101,22 @@ export function MDImporterApp({ win }: { win: WindowState }) {
           apiKey,
           model,
         }),
+        signal: controller.signal,
       });
+      clearTimeout(timeoutId);
+
+      // Handle non-2xx responses gracefully (server may return HTML error page from gateway)
+      const contentType = res.headers.get("content-type") || "";
+      if (!contentType.includes("application/json")) {
+        const text = await res.text();
+        throw new Error(
+          `Resposta inválida do servidor (${res.status}). ${res.status === 502 ? "Timeout do gateway — tente um arquivo menor." : ""}`,
+        );
+      }
+
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error || "Erro ao analisar arquivo");
+        throw new Error(data.error || data.details || `Erro ${res.status}`);
       }
       setPreview({
         projectName: data.projectName ?? name.replace(/\.md$/i, ""),
@@ -110,7 +126,10 @@ export function MDImporterApp({ win }: { win: WindowState }) {
       });
       setStage("preview");
     } catch (e: any) {
-      setError(e?.message ?? String(e));
+      const msg = e?.name === "AbortError"
+        ? "Timeout: a IA demorou mais de 4 minutos. Tente um arquivo menor."
+        : e?.message ?? String(e);
+      setError(msg);
       setStage("error");
     }
   }
