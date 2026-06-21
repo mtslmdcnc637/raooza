@@ -1,0 +1,448 @@
+// Raooza Backend - proxy for AI requests
+// Runs on your VPS, accepts requests from the Vercel-hosted frontend.
+
+import express from "express";
+import cors from "cors";
+import dotenv from "dotenv";
+import { Readable } from "stream";
+
+dotenv.config();
+
+const PORT = process.env.PORT || 8787;
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || "*").split(",").map((s) => s.trim());
+const DEFAULT_PROVIDER = process.env.DEFAULT_PROVIDER || "openrouter";
+const RATE_LIMIT_PER_MINUTE = parseInt(process.env.RATE_LIMIT_PER_MINUTE || "60");
+const LOG_LEVEL = process.env.LOG_LEVEL || "info";
+
+// Provider base URLs (OpenAI-compatible)
+const PROVIDER_BASE_URLS = {
+  glm: "https://api.z.ai/api/paas/v4",
+  openrouter: "https://openrouter.ai/api/v1",
+  deepseek: "https://api.deepseek.com/v1",
+};
+
+const PROVIDER_API_KEYS = {
+  glm: process.env.ZAI_API_KEY,
+  openrouter: process.env.OPENROUTER_API_KEY,
+  deepseek: process.env.DEEPSEEK_API_KEY,
+};
+
+const PROVIDER_DEFAULT_MODELS = {
+  glm: "glm-4.6",
+  openrouter: "anthropic/claude-3.5-sonnet",
+  deepseek: "deepseek-chat",
+};
+
+// In-memory rate limiter (per-IP, per-minute)
+// For multi-instance production, swap with Redis.
+const rateLimitMap = new Map();
+function rateLimit(req, res, next) {
+  const ip = req.headers["x-forwarded-for"]?.split(",")[0] || req.socket.remoteAddress || "unknown";
+  const now = Date.now();
+  const windowMs = 60_000;
+  if (!rateLimitMap.has(ip)) rateLimitMap.set(ip, []);
+  const timestamps = rateLimitMap.get(ip).filter((t) => now - t < windowMs);
+  if (timestamps.length >= RATE_LIMIT_PER_MINUTE) {
+    return res.status(429).json({ error: "Rate limit exceeded. Try again in a minute." });
+  }
+  timestamps.push(now);
+  rateLimitMap.set(ip, timestamps);
+  next();
+}
+
+// Simple in-memory response cache (5min TTL for identical requests)
+const responseCache = new Map();
+const CACHE_TTL_MS = 5 * 60 * 1000;
+function getCached(key) {
+  const entry = responseCache.get(key);
+  if (!entry) return null;
+  if (Date.now() - entry.ts > CACHE_TTL_MS) {
+    responseCache.delete(key);
+    return null;
+  }
+  return entry.value;
+}
+function setCached(key, value) {
+  responseCache.set(key, { ts: Date.now(), value });
+  // Cap cache size
+  if (responseCache.size > 500) {
+    const firstKey = responseCache.keys().next().value;
+    responseCache.delete(firstKey);
+  }
+}
+
+// Logging
+function log(level, ...args) {
+  const levels = ["debug", "info", "warn", "error"];
+  if (levels.indexOf(level) >= levels.indexOf(LOG_LEVEL)) {
+    const prefix = `[${new Date().toISOString()}] [${level.toUpperCase()}]`;
+    if (level === "error") console.error(prefix, ...args);
+    else if (level === "warn") console.warn(prefix, ...args);
+    else console.log(prefix, ...args);
+  }
+}
+
+// Helper: call OpenAI-compatible chat completion
+async function chatCompletion({ provider, apiKey, model, messages, temperature = 0.4, signal }) {
+  const baseUrl = PROVIDER_BASE_URLS[provider];
+  if (!baseUrl) throw new Error(`Unknown provider: ${provider}`);
+  if (!apiKey) throw new Error(`No API key configured for provider: ${provider}`);
+
+  const url = `${baseUrl}/chat/completions`;
+  const headers = {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${apiKey}`,
+  };
+  if (provider === "openrouter") {
+    headers["HTTP-Referer"] = "https://raooza.vercel.app";
+    headers["X-Title"] = "Raooza OS";
+  }
+
+  const body = JSON.stringify({
+    model: model || PROVIDER_DEFAULT_MODELS[provider],
+    messages,
+    temperature,
+    stream: false,
+  });
+
+  const res = await fetch(url, { method: "POST", headers, body, signal });
+  if (!res.ok) {
+    const txt = await res.text();
+    throw new Error(`Provider ${provider} returned ${res.status}: ${txt.slice(0, 400)}`);
+  }
+  const json = await res.json();
+  return json.choices?.[0]?.message?.content ?? "";
+}
+
+// App
+const app = express();
+app.use(express.json({ limit: "5mb" }));
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin || ALLOWED_ORIGINS.includes("*") || ALLOWED_ORIGINS.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error(`Origin ${origin} not allowed by CORS`));
+      }
+    },
+  }),
+);
+
+// Request logging middleware
+app.use((req, _res, next) => {
+  log("info", `${req.method} ${req.path} from ${req.headers["x-forwarded-for"] || req.socket.remoteAddress}`);
+  next();
+});
+
+// Health check
+app.get("/health", (_req, res) => {
+  res.json({
+    ok: true,
+    service: "raooza-backend",
+    version: "1.0.0",
+    defaultProvider: DEFAULT_PROVIDER,
+    configuredProviders: Object.entries(PROVIDER_API_KEYS)
+      .filter(([_, k]) => k)
+      .map(([p]) => p),
+    uptime: process.uptime(),
+  });
+});
+
+// List available models from a provider (no API key required for OpenRouter)
+app.get("/models/:provider", async (req, res) => {
+  const { provider } = req.params;
+  const baseUrl = PROVIDER_BASE_URLS[provider];
+  if (!baseUrl) return res.status(400).json({ error: `Unknown provider: ${provider}` });
+  try {
+    const headers = {};
+    const apiKey = PROVIDER_API_KEYS[provider];
+    if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
+    if (provider === "openrouter") {
+      headers["HTTP-Referer"] = "https://raooza.vercel.app";
+    }
+    const r = await fetch(`${baseUrl}/models`, { headers });
+    if (!r.ok) {
+      const txt = await r.text();
+      return res.status(r.status).json({ error: `Provider returned ${r.status}: ${txt.slice(0, 200)}` });
+    }
+    const data = await r.json();
+    const models = (data.data || []).map((m) => m.id).sort();
+    res.json({ models });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/ai — generic chat completion
+// Body: { provider?, apiKey?, model?, messages, temperature? }
+// If apiKey is provided in body, use it (user-supplied). Otherwise fall back to server env.
+app.post("/api/ai", rateLimit, async (req, res) => {
+  try {
+    const { provider: bodyProvider, apiKey: bodyApiKey, model, messages, temperature } = req.body;
+    const provider = bodyProvider || DEFAULT_PROVIDER;
+    const apiKey = bodyApiKey || PROVIDER_API_KEYS[provider];
+    if (!apiKey) {
+      return res.status(400).json({
+        error: `No API key for provider "${provider}". Either set it on the server or pass apiKey in the request body.`,
+      });
+    }
+    if (!Array.isArray(messages) || messages.length === 0) {
+      return res.status(400).json({ error: "messages must be a non-empty array" });
+    }
+
+    // Cache key (excluding first system prompt for cache efficiency)
+    const cacheKey = JSON.stringify({ provider, model, messages: messages.slice(-4), temperature });
+    const cached = getCached(cacheKey);
+    if (cached) {
+      log("debug", "cache hit for /api/ai");
+      return res.json({ content: cached, cached: true });
+    }
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 90_000);
+    try {
+      const content = await chatCompletion({
+        provider,
+        apiKey,
+        model,
+        messages,
+        temperature,
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
+      setCached(cacheKey, content);
+      res.json({ content });
+    } finally {
+      clearTimeout(timeout);
+    }
+  } catch (e) {
+    log("error", "/api/ai error:", e.message);
+    if (e.name === "AbortError") {
+      return res.status(504).json({ error: "Request timed out (90s)" });
+    }
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/import-md — analyze markdown and return structured actions
+app.post("/api/import-md", rateLimit, async (req, res) => {
+  try {
+    const { fileName, content, provider: bodyProvider, apiKey: bodyApiKey, model } = req.body;
+    if (!fileName || !content) {
+      return res.status(400).json({ error: "fileName and content are required" });
+    }
+    const provider = bodyProvider || DEFAULT_PROVIDER;
+    const apiKey = bodyApiKey || PROVIDER_API_KEYS[provider];
+    if (!apiKey) {
+      return res.status(400).json({ error: `No API key for provider "${provider}".` });
+    }
+
+    const MAX_CONTENT_CHARS = 25000;
+    const truncated = content.length > MAX_CONTENT_CHARS
+      ? content.slice(0, MAX_CONTENT_CHARS) + "\n\n[... conteúdo truncado ...]"
+      : content;
+
+    const systemPrompt = `Você é um assistente que analisa um arquivo markdown (.md) e extrai a estrutura de projeto para configurar um workspace no Raooza OS.
+
+RETORNE APENAS JSON VÁLIDO. Sem markdown. Sem code fences.
+
+Formato:
+{
+  "projectName": "string",
+  "projectDescription": "string curta",
+  "tag": "slug sem espaços/acentos",
+  "actions": [
+    { "app": "wiki"|"kanban"|"notes"|"calendar", "action": "createPage"|"createTask"|"create"|"createEvent", "payload": { "title": "...", "tags": ["#tag#"], ... } }
+  ]
+}
+
+Regras:
+1. Sempre crie 1 wiki page com conteúdo COMPLETO do MD.
+2. Máximo 10 tarefas kanban (extraídas de TODOs/checklists/roadmaps).
+3. Máximo 5 notas (resumos das seções principais).
+4. Eventos de calendário APENAS se houver datas explícitas.
+5. Todas as tags em payloads: "#slug#" (com # no início e fim).
+6. Tag slug limpo: sem espaços, acentos, símbolos.
+7. Resposta deve começar com { e terminar com }.`;
+
+    const userMessage = `Arquivo: ${fileName}\n\nConteúdo:\n\n${truncated}`;
+
+    const messages = [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userMessage },
+    ];
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 180_000); // 3 min for import
+    try {
+      const responseText = await chatCompletion({
+        provider,
+        apiKey,
+        model,
+        messages,
+        temperature: 0.2,
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
+
+      // Parse JSON
+      let parsed = null;
+      let s = responseText.trim();
+      if (s.startsWith("```")) {
+        s = s.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "");
+      }
+      try {
+        parsed = JSON.parse(s);
+      } catch {
+        const match = s.match(/\{[\s\S]*\}/);
+        if (match) {
+          try { parsed = JSON.parse(match[0]); } catch {}
+        }
+      }
+
+      if (!parsed || !Array.isArray(parsed.actions)) {
+        return res.status(422).json({
+          error: "IA não retornou JSON válido",
+          raw: responseText.slice(0, 500),
+        });
+      }
+
+      // Normalize tag
+      const tag = (parsed.tag || fileName.replace(/\.md$/i, "").replace(/[^a-zA-Z0-9]/g, "").toLowerCase())
+        .replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
+      parsed.tag = tag;
+      if (Array.isArray(parsed.actions)) {
+        parsed.actions = parsed.actions.map((a) => {
+          if (a.payload && Array.isArray(a.payload.tags)) {
+            a.payload.tags = a.payload.tags.map((t) => {
+              const clean = String(t || "").replace(/^#/, "").replace(/#$/, "");
+              return clean === tag ? `#${tag}#` : t;
+            });
+          }
+          return a;
+        });
+      }
+      if (!parsed.projectName) parsed.projectName = fileName.replace(/\.md$/i, "");
+
+      res.json(parsed);
+    } finally {
+      clearTimeout(timeout);
+    }
+  } catch (e) {
+    log("error", "/api/import-md error:", e.message);
+    if (e.name === "AbortError") {
+      return res.status(504).json({ error: "Import timed out (180s)" });
+    }
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/myday — generate daily suggestions
+app.post("/api/myday", rateLimit, async (req, res) => {
+  try {
+    const { context, provider: bodyProvider, apiKey: bodyApiKey, model } = req.body;
+    const provider = bodyProvider || DEFAULT_PROVIDER;
+    const apiKey = bodyApiKey || PROVIDER_API_KEYS[provider];
+    if (!apiKey) {
+      return res.status(400).json({ error: `No API key for provider "${provider}".` });
+    }
+
+    const systemPrompt = `Você é o assistente de planejamento do Raooza OS. Sugira de 3 a 5 tarefas prioritárias para HOJE.
+
+RETORNE APENAS JSON VÁLIDO:
+{
+  "summary": "1-2 frases resumindo o foco do dia",
+  "suggestions": [
+    { "title": "...", "reason": "...", "estimatedMinutes": 30, "taskId": "id ou null", "isNew": false }
+  ]
+}
+
+Regras:
+1. Priorize tarefas existentes com dueDate próxima.
+2. Inclua hábitos pendentes de hoje.
+3. Inclua eventos próximos relevantes.
+4. Máximo 5 sugestões.
+5. Responda em português brasileiro.`;
+
+    const userMessage = `Contexto para hoje (${new Date().toLocaleDateString("pt-BR")}):
+
+Tarefas pendentes (kanban):
+${(context?.tasks ?? []).map((t) => `- [${t.id}] ${t.title}${t.dueDate ? ` (vence ${new Date(t.dueDate).toLocaleDateString("pt-BR")})` : ""}`).join("\n") || "(nenhuma)"}
+
+Hábitos não checados hoje:
+${(context?.habits ?? []).map((h) => `- [${h.id}] ${h.title} (${h.cadence})`).join("\n") || "(nenhum)"}
+
+Eventos próximos:
+${(context?.events ?? []).map((e) => `- ${new Date(e.startAt).toLocaleString("pt-BR")} ${e.title}`).join("\n") || "(nenhum)"}
+
+Notas recentes:
+${(context?.recentNotes ?? []).map((n) => `- ${n.title}: ${(n.content ?? "").slice(0, 100)}`).join("\n") || "(nenhuma)"}
+
+Projetos ativos:
+${(context?.activeTags ?? []).map((t) => `- #${t.tag} (${t.count} itens)`).join("\n") || "(nenhum)"}`;
+
+    const messages = [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userMessage },
+    ];
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 60_000);
+    try {
+      const responseText = await chatCompletion({
+        provider,
+        apiKey,
+        model,
+        messages,
+        temperature: 0.4,
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
+
+      let parsed = null;
+      let s = responseText.trim();
+      if (s.startsWith("```")) {
+        s = s.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "");
+      }
+      try { parsed = JSON.parse(s); } catch {
+        const match = s.match(/\{[\s\S]*\}/);
+        if (match) { try { parsed = JSON.parse(match[0]); } catch {} }
+      }
+
+      if (!parsed || !Array.isArray(parsed.suggestions)) {
+        return res.status(422).json({
+          error: "IA não retornou JSON válido",
+          raw: responseText.slice(0, 300),
+        });
+      }
+
+      res.json(parsed);
+    } finally {
+      clearTimeout(timeout);
+    }
+  } catch (e) {
+    log("error", "/api/myday error:", e.message);
+    if (e.name === "AbortError") return res.status(504).json({ error: "Timed out" });
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// 404
+app.use((_req, res) => {
+  res.status(404).json({ error: "Not found" });
+});
+
+// Error handler
+app.use((err, _req, res, _next) => {
+  log("error", "Unhandled:", err.message);
+  res.status(500).json({ error: err.message });
+});
+
+app.listen(PORT, () => {
+  log("info", `Raooza backend listening on port ${PORT}`);
+  log("info", `Default provider: ${DEFAULT_PROVIDER}`);
+  log("info", `Configured providers: ${Object.entries(PROVIDER_API_KEYS).filter(([_, k]) => k).map(([p]) => p).join(", ") || "(none — set API keys in .env)"}`);
+  log("info", `Allowed origins: ${ALLOWED_ORIGINS.join(", ")}`);
+  log("info", `Rate limit: ${RATE_LIMIT_PER_MINUTE} req/min per IP`);
+});

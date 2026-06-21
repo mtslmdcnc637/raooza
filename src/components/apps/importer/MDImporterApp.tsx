@@ -6,7 +6,7 @@ import { getDb, type ProjectImport } from "@/lib/db/db";
 import { useSettings } from "@/stores/settingsStore";
 import { useSystemBus } from "@/stores/systemBus";
 import { executeBatch } from "@/lib/ai/executor";
-import { PROVIDERS } from "@/lib/ai/providers";
+import { PROVIDERS, apiUrl } from "@/lib/ai/providers";
 import type { WindowState, RaoozaAction } from "@/lib/os/types";
 import {
   Upload,
@@ -91,7 +91,7 @@ export function MDImporterApp({ win }: { win: WindowState }) {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 4 * 60 * 1000);
 
-      const res = await fetch("/api/import-md", {
+      const res = await fetch(apiUrl("/api/import-md"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

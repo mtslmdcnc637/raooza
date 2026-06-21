@@ -6,6 +6,7 @@ import { getDb } from "@/lib/db/db";
 import { useSettings } from "@/stores/settingsStore";
 import { useSystemBus } from "@/stores/systemBus";
 import { executeBatch } from "@/lib/ai/executor";
+import { apiUrl } from "@/lib/ai/providers";
 import { Sparkles, Loader2, RefreshCw, Plus, Calendar, Clock, X, Brain } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { RaoozaAction } from "@/lib/os/types";
@@ -68,7 +69,7 @@ export function MyDayApp() {
       const activeTags = imports.map((imp) => ({ tag: imp.tag, count: imp.items.length }));
 
       const settings = useSettings.getState();
-      const res = await fetch("/api/myday", {
+      const res = await fetch(apiUrl("/api/myday"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

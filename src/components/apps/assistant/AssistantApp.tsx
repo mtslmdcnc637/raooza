@@ -6,7 +6,7 @@ import { getDb, type ChatMessage, type ChatConversation } from "@/lib/db/db";
 import { useSettings } from "@/stores/settingsStore";
 import { useSystemBus } from "@/stores/systemBus";
 import { executeBatch } from "@/lib/ai/executor";
-import { PROVIDERS } from "@/lib/ai/providers";
+import { PROVIDERS, apiUrl } from "@/lib/ai/providers";
 import { useVoiceInput } from "@/lib/voice/useVoiceInput";
 import { Send, Sparkles, Loader2, Trash2, Plus, Settings as SettingsIcon, Check, X, Mic } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -114,7 +114,7 @@ export function AssistantApp() {
         content: m.content,
       }));
 
-      const res = await fetch("/api/ai", {
+      const res = await fetch(apiUrl("/api/ai"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

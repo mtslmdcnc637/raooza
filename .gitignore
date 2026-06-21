@@ -52,3 +52,11 @@ prompt
 server.log
 # Skills directory
 /skills/
+# Raooza extras
+/download/*.png
+/download/*.jpg
+/zscripts/
+/backend/node_modules
+/backend/.env
+.env.local
+.env.production

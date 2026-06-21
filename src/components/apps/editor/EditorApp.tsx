@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { getDb, type EditorDoc } from "@/lib/db/db";
+import { apiUrl } from "@/lib/ai/providers";
 import { useSystemBus } from "@/stores/systemBus";
 import { useWindowStore } from "@/stores/windowStore";
 import {
@@ -246,7 +247,7 @@ function DocEditor({ doc }: { doc: EditorDoc }) {
       <div className="flex items-center gap-2 mb-6 pb-3 border-b border-border/40">
         <button
           onClick={async () => {
-            const res = await fetch("/api/ai", {
+            const res = await fetch(apiUrl("/api/ai"), {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
@@ -284,7 +285,7 @@ function DocEditor({ doc }: { doc: EditorDoc }) {
           onClick={async () => {
             const last = blocks[blocks.length - 1];
             if (!last || !last.text) return;
-            const res = await fetch("/api/ai", {
+            const res = await fetch(apiUrl("/api/ai"), {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({

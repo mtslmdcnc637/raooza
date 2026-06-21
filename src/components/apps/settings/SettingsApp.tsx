@@ -7,7 +7,7 @@ import {
   ACCENTS,
   type AIProvider,
 } from "@/stores/settingsStore";
-import { PROVIDERS } from "@/lib/ai/providers";
+import { PROVIDERS, apiUrl, USE_BACKEND, BACKEND_URL } from "@/lib/ai/providers";
 import { Palette, ImageIcon, Bot, Sun, Moon, Check, ExternalLink, KeyRound } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -212,11 +212,18 @@ function AiTab() {
     setLoadingModels(true);
     setModelsError("");
     try {
-      // OpenRouter exposes /models publicly (no API key needed to list models)
-      const res = await fetch("https://openrouter.ai/api/v1/models");
+      // If using backend, fetch from backend's /models/:provider endpoint (proxied, with API key if available)
+      // Otherwise fetch directly from OpenRouter's public /models endpoint
+      const url = USE_BACKEND
+        ? apiUrl("/models/openrouter")
+        : "https://openrouter.ai/api/v1/models";
+      const res = await fetch(url);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      const modelIds: string[] = (data.data ?? []).map((m: any) => m.id);
+      // Backend returns { models: string[] }, OpenRouter returns { data: [{id}, ...] }
+      const modelIds: string[] = USE_BACKEND
+        ? (data.models ?? [])
+        : (data.data ?? []).map((m: any) => m.id);
       modelIds.sort();
       setDynamicModels(modelIds);
     } catch (e: any) {
@@ -241,6 +248,23 @@ function AiTab() {
 
   return (
     <div className="max-w-2xl space-y-6">
+      {/* Backend status banner */}
+      <div className={`rounded-lg p-3 border text-xs ${USE_BACKEND ? "bg-green-500/10 border-green-500/30 text-green-700 dark:text-green-300" : "bg-muted/40 border-border/40 text-muted-foreground"}`}>
+        {USE_BACKEND ? (
+          <>
+            <div className="font-semibold mb-0.5">🌐 Conectado ao backend da VPS</div>
+            <div>URL: <code className="font-mono bg-background/60 px-1 rounded">{BACKEND_URL}</code></div>
+            <div className="mt-1">As chamadas de IA passam pelo seu servidor, que injeta a API key do ambiente. Você não precisa digitar a chave abaixo (ela é ignorada).</div>
+          </>
+        ) : (
+          <>
+            <div className="font-semibold mb-0.5">💻 Modo standalone (sem backend)</div>
+            <div>As chamadas de IA vão direto para o provedor a partir do browser. Sua API key fica no localStorage.</div>
+            <div className="mt-1">Para usar um backend na VPS, defina <code className="font-mono bg-background/60 px-1 rounded">NEXT_PUBLIC_BACKEND_URL</code> nas variáveis de ambiente da Vercel.</div>
+          </>
+        )}
+      </div>
+
       <section>
         <h3 className="text-sm font-semibold mb-3">Provedor de IA</h3>
         <div className="space-y-2">

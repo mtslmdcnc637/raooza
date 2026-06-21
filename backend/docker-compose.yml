@@ -1,0 +1,37 @@
+services:
+  raooza-backend:
+    build: .
+    container_name: raooza-backend
+    restart: unless-stopped
+    ports:
+      - "8787:8787"
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O-", "http://localhost:8787/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+  # Optional: Caddy reverse proxy for HTTPS with auto Let's Encrypt
+  # Uncomment if you want automatic TLS + domain
+  #
+  # caddy:
+  #   image: caddy:2-alpine
+  #   restart: unless-stopped
+  #   ports:
+  #     - "80:80"
+  #     - "443:443"
+  #   volumes:
+  #     - ./Caddyfile:/etc/caddy/Caddyfile
+  #     - caddy_data:/data
+  #     - caddy_config:/config
+  #   depends_on:
+  #     - raooza-backend
+
+# volumes:
+#   caddy_data:
+#   caddy_config:

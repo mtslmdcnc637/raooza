@@ -1,0 +1,13 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "nextjs",
+  "buildCommand": "bun run build",
+  "installCommand": "bun install",
+  "outputDirectory": ".next",
+  "regions": ["gru1"],
+  "functions": {
+    "/api/ai": { "maxDuration": 60 },
+    "/api/import-md": { "maxDuration": 300 },
+    "/api/myday": { "maxDuration": 60 }
+  }
+}

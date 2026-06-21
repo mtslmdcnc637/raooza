@@ -1,0 +1,22 @@
+# Replace with your actual domain (or use :80 for HTTP-only testing)
+raooza-api.seudominio.com {
+    reverse_proxy raooza-backend:8787 {
+        header_up Host {host}
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+    }
+
+    # CORS headers for the frontend (Vercel)
+    @cors_preflight method OPTIONS
+    handle @cors_preflight {
+        header Access-Control-Allow-Origin "https://raooza.vercel.app"
+        header Access-Control-Allow-Methods "GET, POST, OPTIONS"
+        header Access-Control-Allow-Headers "Content-Type, Authorization"
+        header Access-Control-Max-Age "3600"
+        respond 204
+    }
+
+    # Compression
+    encode gzip zstd
+}

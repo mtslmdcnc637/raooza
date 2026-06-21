@@ -13,6 +13,12 @@ export interface ProviderConfig {
   baseUrl: string;
 }
 
+// If Vercel frontend should talk to a VPS backend instead of Next.js API routes,
+// set NEXT_PUBLIC_BACKEND_URL in your Vercel env vars.
+// Example: NEXT_PUBLIC_BACKEND_URL=https://raooza-api.seudominio.com
+export const BACKEND_URL = (typeof process !== "undefined" && process.env.NEXT_PUBLIC_BACKEND_URL) || "";
+export const USE_BACKEND = BACKEND_URL.length > 0;
+
 // OpenAI-compatible chat completion fetch (works for OpenRouter, DeepSeek, and Z.ai with custom key)
 export async function openAICompatibleChat(
   baseUrl: string,
@@ -41,6 +47,14 @@ export async function openAICompatibleChat(
   }
   const json = await res.json();
   return json.choices?.[0]?.message?.content ?? "";
+}
+
+// Build the API endpoint URL. If BACKEND_URL is set, use it. Otherwise use local Next.js route.
+export function apiUrl(path: string): string {
+  if (USE_BACKEND) {
+    return `${BACKEND_URL}${path}`;
+  }
+  return path;
 }
 
 export const PROVIDERS: Record<AIProvider, ProviderConfig> = {
