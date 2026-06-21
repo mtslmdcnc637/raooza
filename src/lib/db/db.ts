@@ -162,6 +162,47 @@ export interface Snippet {
   updatedAt: string;
 }
 
+export interface VideoProject {
+  id: string;
+  title: string;
+  description?: string;
+  status: "idea" | "scripting" | "recording" | "editing" | "published" | "archived";
+  platform?: "youtube" | "tiktok" | "instagram" | "twitter" | "other";
+  targetDuration?: number; // seconds
+  thumbnailIdeas?: string;
+  publishedUrl?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface VideoPrompt {
+  id: string;
+  projectId: string;
+  title: string;
+  content: string;
+  type: "image" | "video" | "audio" | "text" | "thumbnail";
+  rating: number; // 0-5
+  status: "draft" | "testing" | "approved" | "rejected";
+  result?: string; // what was generated / URL
+  notes?: string; // what worked, what didn't
+  tags: string[];
+  version: number;
+  parentPromptId?: string; // for prompt iterations
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface VideoNote {
+  id: string;
+  projectId: string;
+  type: "hook" | "script" | "shot" | "broll" | "idea" | "general";
+  title: string;
+  content: string;
+  order: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export class RaoozaDB extends Dexie {
   notes!: Table<NoteRecord, string>;
   kanbanBoards!: Table<KanbanBoard, string>;
@@ -178,10 +219,13 @@ export class RaoozaDB extends Dexie {
   imports!: Table<ProjectImport, string>;
   templates!: Table<Template, string>;
   snippets!: Table<Snippet, string>;
+  videoProjects!: Table<VideoProject, string>;
+  videoPrompts!: Table<VideoPrompt, string>;
+  videoNotes!: Table<VideoNote, string>;
 
   constructor() {
     super("raooza");
-    this.version(5).stores({
+    this.version(6).stores({
       notes: "id, pinned, updatedAt, *tags",
       kanbanBoards: "id, updatedAt",
       kanbanTasks: "id, boardId, columnId, order, updatedAt, *tags",
@@ -197,6 +241,9 @@ export class RaoozaDB extends Dexie {
       imports: "id, tag, createdAt",
       templates: "id, category, name",
       snippets: "id, &trigger, name",
+      videoProjects: "id, status, platform, updatedAt",
+      videoPrompts: "id, projectId, type, status, rating, updatedAt, *tags",
+      videoNotes: "id, projectId, type, order, updatedAt",
     });
   }
 }

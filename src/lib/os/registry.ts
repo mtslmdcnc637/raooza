@@ -426,6 +426,18 @@ export const APP_MANIFESTS: AppManifest[] = [
     category: "productivity",
     actions: [],
   },
+  {
+    id: "video",
+    name: "Vídeos",
+    description: "Planejamento de vídeos: prompts com avaliação, hooks, roteiro, planos",
+    icon: null as any,
+    defaultSize: { width: 960, height: 700 },
+    minSize: { width: 500, height: 400 },
+    resizable: true,
+    pinnable: true,
+    category: "productivity",
+    actions: [],
+  },
 ];
 
 // System-level actions (not bound to a single app)

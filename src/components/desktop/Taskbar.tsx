@@ -26,6 +26,7 @@ import {
   Upload,
   LayoutTemplate,
   Zap,
+  Video,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { StartMenu } from "./StartMenu";
@@ -47,10 +48,12 @@ const ICONS: Record<string, any> = {
   myday: Brain,
   templates: LayoutTemplate,
   snippets: Zap,
+  video: Video,
 };
 
 const PINNED = [
   "myday",
+  "video",
   "notes",
   "kanban",
   "pomodoro",

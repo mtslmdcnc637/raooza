@@ -21,6 +21,7 @@ import {
   Brain,
   LayoutTemplate,
   Zap,
+  Video,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSettings } from "@/stores/settingsStore";
@@ -41,6 +42,7 @@ const ICONS: Record<string, any> = {
   myday: Brain,
   templates: LayoutTemplate,
   snippets: Zap,
+  video: Video,
 };
 
 interface Props {
