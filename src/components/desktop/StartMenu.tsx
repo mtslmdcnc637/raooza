@@ -23,6 +23,7 @@ import {
   Zap,
   Video,
   MessageCircle,
+  GraduationCap,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSettings } from "@/stores/settingsStore";
@@ -45,6 +46,7 @@ const ICONS: Record<string, any> = {
   snippets: Zap,
   video: Video,
   messages: MessageCircle,
+  youtube: GraduationCap,
 };
 
 interface Props {

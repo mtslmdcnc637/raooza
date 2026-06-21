@@ -225,6 +225,60 @@ export interface Message {
   pinnedAt?: string;
 }
 
+// YouTube Studio — study tool for YouTube videos
+export interface YouTubeVideo {
+  id: string;
+  videoId: string; // YouTube video ID (from URL)
+  title: string;
+  channel?: string;
+  thumbnail?: string;
+  status: "not-started" | "in-progress" | "completed";
+  progressSec: number; // last position
+  durationSec?: number;
+  addedAt: string;
+  updatedAt: string;
+}
+
+export interface YouTubeNote {
+  id: string;
+  videoId: string; // links to YouTubeVideo.id
+  timestampSec?: number; // video moment when note was taken (optional)
+  content: string; // markdown-ish
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface YouTubeBookmark {
+  id: string;
+  videoId: string;
+  timestampSec: number;
+  label: string;
+  color?: string;
+  createdAt: string;
+}
+
+export interface YouTubeFlashcard {
+  id: string;
+  videoId: string;
+  front: string;
+  back: string;
+  lastReviewedAt?: string;
+  correctCount: number;
+  incorrectCount: number;
+  createdAt: string;
+}
+
+export interface YouTubeCanvas {
+  id: string;
+  videoId: string;
+  timestampSec?: number; // optional: linked to a video moment
+  title: string;
+  // Array of stroke objects: { color, size, points: [[x,y],...] }
+  strokes: any[];
+  createdAt: string;
+  updatedAt: string;
+}
+
 export class RaoozaDB extends Dexie {
   notes!: Table<NoteRecord, string>;
   kanbanBoards!: Table<KanbanBoard, string>;
@@ -246,10 +300,15 @@ export class RaoozaDB extends Dexie {
   videoNotes!: Table<VideoNote, string>;
   peers!: Table<Peer, string>;
   messages!: Table<Message, string>;
+  youtubeVideos!: Table<YouTubeVideo, string>;
+  youtubeNotes!: Table<YouTubeNote, string>;
+  youtubeBookmarks!: Table<YouTubeBookmark, string>;
+  youtubeFlashcards!: Table<YouTubeFlashcard, string>;
+  youtubeCanvases!: Table<YouTubeCanvas, string>;
 
   constructor() {
     super("raooza");
-    this.version(7).stores({
+    this.version(8).stores({
       notes: "id, pinned, updatedAt, *tags",
       kanbanBoards: "id, updatedAt",
       kanbanTasks: "id, boardId, columnId, order, updatedAt, *tags",
@@ -270,6 +329,11 @@ export class RaoozaDB extends Dexie {
       videoNotes: "id, projectId, type, order, updatedAt",
       peers: "id, displayName, addedAt",
       messages: "id, peerId, direction, createdAt, read, pinned",
+      youtubeVideos: "id, videoId, status, updatedAt",
+      youtubeNotes: "id, videoId, timestampSec, updatedAt",
+      youtubeBookmarks: "id, videoId, timestampSec",
+      youtubeFlashcards: "id, videoId, lastReviewedAt",
+      youtubeCanvases: "id, videoId, timestampSec, updatedAt",
     });
   }
 }

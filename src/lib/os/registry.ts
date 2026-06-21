@@ -450,6 +450,18 @@ export const APP_MANIFESTS: AppManifest[] = [
     category: "productivity",
     actions: [],
   },
+  {
+    id: "youtube",
+    name: "YouTube Studio",
+    description: "Estude vídeos: anotações com timestamp, resumo IA, quadro, flashcards",
+    icon: null as any,
+    defaultSize: { width: 1200, height: 760 },
+    minSize: { width: 600, height: 500 },
+    resizable: true,
+    pinnable: true,
+    category: "productivity",
+    actions: [],
+  },
 ];
 
 // System-level actions (not bound to a single app)
