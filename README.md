@@ -9,11 +9,11 @@ Sistema operacional web completo com notas inteligentes, kanban, pomodoro, calen
 - **IA**: GLM (Z.ai) | OpenRouter (Claude/GPT/Llama/Gemini) | DeepSeek — selecionável
 - **PWA**: manifest + service worker (instalável, offline-ready)
 
-## Deploy rápido
+## Deploy
 
-### Opção A — Frontend only (Vercel grátis) + chaves de IA no navegador
+### Modo padrão (recomendado): Frontend only
 
-Mais simples. As chamadas de IA vão direto do browser para o provedor (OpenRouter/DeepSeek). A API key fica no localStorage do usuário.
+Tudo roda no browser do usuário. A API key que ele digita em **Configurações > IA** é armazenada apenas no `localStorage` dele e enviada direto pro provedor escolhido. Nenhuma chave sua é necessária.
 
 ```bash
 # 1. Push para GitHub
@@ -21,33 +21,34 @@ git init && git add . && git commit -m "Initial commit"
 git remote add origin git@github.com:seu-usuario/raooza.git
 git push -u origin main
 
-# 2. Na Vercel
-# Importe o repo em https://vercel.com/new
-# A Vercel detecta Next.js automaticamente
-# Não precisa de nenhuma env var — clique em Deploy
+# 2. Na Vercel: https://vercel.com/new
+#    Importe o repo. Não configure nenhuma env var.
+#    Deploy. Pronto.
 ```
 
-### Opção B — Frontend (Vercel) + Backend (sua VPS) — RECOMENDADO
+Os usuários vão em **Configurações > IA**, escolhem o provedor (OpenRouter/DeepSeek/GLM), digitam a própria API key. O tutorial passo-a-passo ensina a pegar a chave do OpenRouter.
 
-O backend na VPS guarda as API keys no ambiente. O frontend Vercel só fala com seu backend. Mais seguro, e permite rate limiting + cache.
+### Modo opcional: Backend na VPS (cache + rate-limit)
+
+Se quiser ter um proxy na sua VPS que faz cache de respostas idênticas e rate limiting por IP, pode subir o backend incluso em `/backend`. Mesmo nesse modo, **a API key do usuário sempre tem prioridade** — o backend só usa uma chave própria (do `.env`) como fallback se o usuário não informar a dele.
 
 ```bash
-# 1. Deploy do backend na VPS
-cd backend
+# Na VPS:
+git clone https://github.com/SEU_USUARIO/raooza.git
+cd raooza/backend
 cp .env.example .env
-# Edite .env e preencha OPENROUTER_API_KEY=sk-or-v1-...
-docker compose up -d
-# Teste: curl http://sua-vps:8787/health
-
-# 2. (Opcional) Configure HTTPS com Caddy
-# Edite backend/Caddyfile com seu domínio (ex: raooza-api.seudominio.com)
-# Descomente o bloco caddy em backend/docker-compose.yml
+# Edite .env: preencha ALLOWED_ORIGINS com a URL da Vercel
+# (deixe as API keys vazias — usuários vão usar as deles)
 docker compose up -d
 
-# 3. Deploy do frontend na Vercel
-# Importe o repo, e configure a env var:
+# (Opcional) HTTPS com domínio próprio via Caddy:
+# 1. Aponte raooza-api.seudominio.com pro IP da VPS
+# 2. Edite Caddyfile com seu domínio
+# 3. Descomente o bloco caddy em docker-compose.yml
+# 4. docker compose up -d
+
+# Na Vercel, configure a env var:
 # NEXT_PUBLIC_BACKEND_URL=https://raooza-api.seudominio.com
-# Deploy
 ```
 
 ## Estrutura
@@ -58,10 +59,10 @@ raooza/
 │   ├── app/
 │   │   ├── page.tsx              # Boot → Login → Desktop
 │   │   ├── layout.tsx            # Manifest, theme, PWA register
-│   │   └── api/                  # API routes (fallback quando sem backend)
-│   │       ├── ai/route.ts       # POST /api/ai
-│   │       ├── import-md/route.ts# POST /api/import-md
-│   │       └── myday/route.ts    # POST /api/myday
+│   │   └── api/                  # API routes (usadas quando NEXT_PUBLIC_BACKEND_URL está vazio)
+│   │       ├── ai/route.ts
+│   │       ├── import-md/route.ts
+│   │       └── myday/route.ts
 │   ├── components/
 │   │   ├── desktop/              # Boot, Login, Desktop, Taskbar, Window, etc
 │   │   └── apps/                 # 14 apps (notes, kanban, pomodoro, ...)
@@ -70,8 +71,8 @@ raooza/
 │   │   ├── db/                   # Dexie schema (IndexedDB)
 │   │   └── os/                   # App registry + types
 │   └── stores/                   # Zustand stores
-├── backend/                      # Backend standalone (VPS)
-│   ├── index.js                  # Express server: /api/ai, /api/import-md, /api/myday, /models/:provider
+├── backend/                      # Backend opcional (VPS) — proxy + cache + rate-limit
+│   ├── index.js                  # Express: /api/ai, /api/import-md, /api/myday, /models/:provider
 │   ├── package.json
 │   ├── Dockerfile
 │   ├── docker-compose.yml
@@ -103,7 +104,7 @@ raooza/
 | ⚡ **Snippets** | `/trigger` + espaço expande em qualquer campo |
 | 📁 **Arquivos** | Navegação por notas/docs/tarefas/eventos/wiki/hábitos |
 | ⬆️ **Importar MD** | Arraste um .md → IA configura o ambiente |
-| ⚙️ **Configurações** | Tema, wallpaper, acento, provedor IA |
+| ⚙️ **Configurações** | Tema, wallpaper, acento, provedor IA, API key |
 
 ## Atalhos
 
@@ -111,18 +112,25 @@ raooza/
 - Arrastar janela pra borda — Snap layout
 - Arrastar `.md` pro desktop — Importar
 
+## Privacidade
+
+- Sua API key fica apenas no `localStorage` do seu navegador
+- Chamadas de IA vão direto do browser para o provedor (ou passam pelo seu backend opcional, mas a chave do usuário sempre tem prioridade)
+- O Raooza não coleta nenhum dado pessoal
+- Tudo que você cria (notas, tarefas, etc) fica no IndexedDB local
+
 ## Variáveis de ambiente
 
 ### Frontend (Vercel)
 
 | Var | Default | Descrição |
 |---|---|---|
-| `NEXT_PUBLIC_BACKEND_URL` | (vazio) | URL do backend da VPS. Se vazio, usa API routes locais. |
-| `ZAI_API_KEY` | (env do sandbox) | Usado só pela API route `/api/ai` quando sem backend. |
+| `NEXT_PUBLIC_BACKEND_URL` | (vazio) | URL do backend opcional da VPS. Se vazio, usa API routes locais. |
+| `ZAI_API_KEY` | (env do sandbox) | Usado só pela API route `/api/ai` quando GLM selecionado sem key do usuário. |
 
-### Backend (VPS)
+### Backend (VPS, opcional)
 
-Ver `backend/.env.example`.
+Ver `backend/.env.example`. Todas as API keys são **opcionais** — servem como fallback se o usuário não informar a própria.
 
 ## Licença
 

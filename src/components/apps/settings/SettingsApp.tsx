@@ -7,7 +7,7 @@ import {
   ACCENTS,
   type AIProvider,
 } from "@/stores/settingsStore";
-import { PROVIDERS, apiUrl, USE_BACKEND, BACKEND_URL } from "@/lib/ai/providers";
+import { PROVIDERS, apiUrl } from "@/lib/ai/providers";
 import { Palette, ImageIcon, Bot, Sun, Moon, Check, ExternalLink, KeyRound } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -248,23 +248,6 @@ function AiTab() {
 
   return (
     <div className="max-w-2xl space-y-6">
-      {/* Backend status banner */}
-      <div className={`rounded-lg p-3 border text-xs ${USE_BACKEND ? "bg-green-500/10 border-green-500/30 text-green-700 dark:text-green-300" : "bg-muted/40 border-border/40 text-muted-foreground"}`}>
-        {USE_BACKEND ? (
-          <>
-            <div className="font-semibold mb-0.5">🌐 Conectado ao backend da VPS</div>
-            <div>URL: <code className="font-mono bg-background/60 px-1 rounded">{BACKEND_URL}</code></div>
-            <div className="mt-1">As chamadas de IA passam pelo seu servidor, que injeta a API key do ambiente. Você não precisa digitar a chave abaixo (ela é ignorada).</div>
-          </>
-        ) : (
-          <>
-            <div className="font-semibold mb-0.5">💻 Modo standalone (sem backend)</div>
-            <div>As chamadas de IA vão direto para o provedor a partir do browser. Sua API key fica no localStorage.</div>
-            <div className="mt-1">Para usar um backend na VPS, defina <code className="font-mono bg-background/60 px-1 rounded">NEXT_PUBLIC_BACKEND_URL</code> nas variáveis de ambiente da Vercel.</div>
-          </>
-        )}
-      </div>
-
       <section>
         <h3 className="text-sm font-semibold mb-3">Provedor de IA</h3>
         <div className="space-y-2">
@@ -329,8 +312,8 @@ function AiTab() {
                 <p>O OpenRouter tem modelos gratuitos (ex: <code className="font-mono bg-muted px-1 rounded">meta-llama/llama-3.3-70b-instruct:free</code>) que você pode usar sem pagar. Para modelos pagos (Claude, GPT-4), adicione crédito em "Credits".</p>
               </div>
               <div className="p-3 rounded-md bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-200">
-                <div className="font-semibold mb-1">💡 Dica de segurança</div>
-                <p>Como você tem uma VPS, pode criar um proxy que injeta a chave do servidor. Mas para uso pessoal, manter a chave no browser é seguro (só você acessa seu computador). Nunca compartilhe sua chave publicamente.</p>
+                <div className="font-semibold mb-1">💡 Dica</div>
+                <p>A chave fica salva apenas no seu navegador. Você pode usar a mesma chave em quantos dispositivos quiser.</p>
               </div>
             </div>
           )}
@@ -413,19 +396,11 @@ function AiTab() {
         )}
       </section>
 
-      {/* VPS tip */}
-      {aiProvider === "openrouter" && (
-        <section className="rounded-lg border border-border/40 bg-muted/20 p-3 text-xs text-muted-foreground">
-          <div className="font-semibold text-foreground mb-1">🌐 Usando sua VPS como proxy (opcional)</div>
-          <p>Como você mencionou que tem uma VPS, pode configurar um proxy lá que injeta a chave do OpenRouter e expor um endpoint próprio. Isso permite:</p>
-          <ul className="list-disc pl-4 mt-1 space-y-0.5">
-            <li>Usar o Raooza em qualquer dispositivo sem expor a chave</li>
-            <li>Rate limiting e logs centralizados</li>
-            <li>Cache de respostas idênticas</li>
-          </ul>
-          <p className="mt-1.5">O Raooza já é compatível com qualquer endpoint OpenAI-compatível. Basta apontar <code className="font-mono bg-muted px-1 rounded">baseUrl</code> em <code className="font-mono bg-muted px-1 rounded">src/lib/ai/providers.ts</code> para a URL do seu proxy.</p>
-        </section>
-      )}
+      {/* Privacy note */}
+      <section className="rounded-lg border border-border/40 bg-muted/20 p-3 text-xs text-muted-foreground">
+        <div className="font-semibold text-foreground mb-1">🔒 Privacidade</div>
+        <p>Sua API key é armazenada apenas no seu navegador (localStorage) e enviada diretamente para o provedor escolhido. Ela nunca passa por servidores do Raooza.</p>
+      </section>
     </div>
   );
 }

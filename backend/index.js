@@ -135,16 +135,12 @@ app.use((req, _res, next) => {
   next();
 });
 
-// Health check
+// Health check (public — no sensitive info)
 app.get("/health", (_req, res) => {
   res.json({
     ok: true,
     service: "raooza-backend",
     version: "1.0.0",
-    defaultProvider: DEFAULT_PROVIDER,
-    configuredProviders: Object.entries(PROVIDER_API_KEYS)
-      .filter(([_, k]) => k)
-      .map(([p]) => p),
     uptime: process.uptime(),
   });
 });
@@ -176,27 +172,41 @@ app.get("/models/:provider", async (req, res) => {
 
 // POST /api/ai — generic chat completion
 // Body: { provider?, apiKey?, model?, messages, temperature? }
-// If apiKey is provided in body, use it (user-supplied). Otherwise fall back to server env.
+//
+// API KEY PRIORITY:
+//   1. apiKey from request body (user-supplied — always wins)
+//   2. Server-side env var for the provider (fallback if user didn't supply)
+//
+// The backend NEVER stores the user's API key. It's only used in-memory
+// to make the single request, then discarded.
 app.post("/api/ai", rateLimit, async (req, res) => {
   try {
     const { provider: bodyProvider, apiKey: bodyApiKey, model, messages, temperature } = req.body;
     const provider = bodyProvider || DEFAULT_PROVIDER;
-    const apiKey = bodyApiKey || PROVIDER_API_KEYS[provider];
+    const userApiKey = bodyApiKey && bodyApiKey.length > 0 ? bodyApiKey : null;
+    const serverApiKey = PROVIDER_API_KEYS[provider];
+    const apiKey = userApiKey || serverApiKey;
+    const usingUserKey = !!userApiKey;
+
     if (!apiKey) {
       return res.status(400).json({
-        error: `No API key for provider "${provider}". Either set it on the server or pass apiKey in the request body.`,
+        error: `No API key for provider "${provider}". Set one in Configurações > IA.`,
       });
     }
     if (!Array.isArray(messages) || messages.length === 0) {
       return res.status(400).json({ error: "messages must be a non-empty array" });
     }
 
-    // Cache key (excluding first system prompt for cache efficiency)
-    const cacheKey = JSON.stringify({ provider, model, messages: messages.slice(-4), temperature });
-    const cached = getCached(cacheKey);
-    if (cached) {
-      log("debug", "cache hit for /api/ai");
-      return res.json({ content: cached, cached: true });
+    // Cache only when using server key (don't cache user-keyed requests — could leak between users)
+    const cacheKey = usingUserKey
+      ? null
+      : JSON.stringify({ provider, model, messages: messages.slice(-4), temperature });
+    if (cacheKey) {
+      const cached = getCached(cacheKey);
+      if (cached) {
+        log("debug", "cache hit for /api/ai");
+        return res.json({ content: cached, cached: true });
+      }
     }
 
     const controller = new AbortController();
@@ -211,7 +221,7 @@ app.post("/api/ai", rateLimit, async (req, res) => {
         signal: controller.signal,
       });
       clearTimeout(timeout);
-      setCached(cacheKey, content);
+      if (cacheKey) setCached(cacheKey, content);
       res.json({ content });
     } finally {
       clearTimeout(timeout);
@@ -233,9 +243,10 @@ app.post("/api/import-md", rateLimit, async (req, res) => {
       return res.status(400).json({ error: "fileName and content are required" });
     }
     const provider = bodyProvider || DEFAULT_PROVIDER;
-    const apiKey = bodyApiKey || PROVIDER_API_KEYS[provider];
+    const userApiKey = bodyApiKey && bodyApiKey.length > 0 ? bodyApiKey : null;
+    const apiKey = userApiKey || PROVIDER_API_KEYS[provider];
     if (!apiKey) {
-      return res.status(400).json({ error: `No API key for provider "${provider}".` });
+      return res.status(400).json({ error: `No API key for provider "${provider}". Set one in Configurações > IA.` });
     }
 
     const MAX_CONTENT_CHARS = 25000;
@@ -343,9 +354,10 @@ app.post("/api/myday", rateLimit, async (req, res) => {
   try {
     const { context, provider: bodyProvider, apiKey: bodyApiKey, model } = req.body;
     const provider = bodyProvider || DEFAULT_PROVIDER;
-    const apiKey = bodyApiKey || PROVIDER_API_KEYS[provider];
+    const userApiKey = bodyApiKey && bodyApiKey.length > 0 ? bodyApiKey : null;
+    const apiKey = userApiKey || PROVIDER_API_KEYS[provider];
     if (!apiKey) {
-      return res.status(400).json({ error: `No API key for provider "${provider}".` });
+      return res.status(400).json({ error: `No API key for provider "${provider}". Set one in Configurações > IA.` });
     }
 
     const systemPrompt = `Você é o assistente de planejamento do Raooza OS. Sugira de 3 a 5 tarefas prioritárias para HOJE.
@@ -442,7 +454,7 @@ app.use((err, _req, res, _next) => {
 app.listen(PORT, () => {
   log("info", `Raooza backend listening on port ${PORT}`);
   log("info", `Default provider: ${DEFAULT_PROVIDER}`);
-  log("info", `Configured providers: ${Object.entries(PROVIDER_API_KEYS).filter(([_, k]) => k).map(([p]) => p).join(", ") || "(none — set API keys in .env)"}`);
   log("info", `Allowed origins: ${ALLOWED_ORIGINS.join(", ")}`);
   log("info", `Rate limit: ${RATE_LIMIT_PER_MINUTE} req/min per IP`);
+  log("info", `API key priority: user-supplied (request body) → server env var`);
 });
