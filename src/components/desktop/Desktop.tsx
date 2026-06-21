@@ -8,7 +8,9 @@ import { Taskbar } from "./Taskbar";
 import { StickyNotesLayer } from "./StickyNotesLayer";
 import { DashboardWidget } from "./dashboard/DashboardWidget";
 import { FocusMode } from "./focusmode/FocusMode";
+import { CommandPalette } from "./commandpalette/CommandPalette";
 import { useSystemBus } from "@/stores/systemBus";
+import { useSnippetsExpansion } from "@/lib/snippets/useSnippetsExpansion";
 import { APP_REGISTRY } from "@/components/apps/registry";
 
 export function Desktop() {
@@ -18,8 +20,13 @@ export function Desktop() {
   const windows = useWindowStore((s) => s.windows);
   const open = useWindowStore((s) => s.open);
   const refreshTick = useSystemBus((s) => s.refreshTick);
+  const paletteOpen = useSystemBus((s) => s.paletteOpen);
+  const setPaletteOpen = useSystemBus((s) => s.setPaletteOpen);
   const [dragOver, setDragOver] = useState(false);
   void refreshTick;
+
+  // Activate snippet expansion globally
+  useSnippetsExpansion();
 
   const wp = WALLPAPERS.find((w) => w.id === wallpaperId) ?? WALLPAPERS[0];
   const bg = customWallpaper ? `url(${customWallpaper}) center/cover` : wp.css;
@@ -29,6 +36,19 @@ export function Desktop() {
     document.documentElement.style.setProperty("--accent-color", accent);
     document.documentElement.style.setProperty("--primary", accent);
   }, [accent]);
+
+  // Global keyboard shortcuts
+  useEffect(() => {
+    function handler(e: KeyboardEvent) {
+      // Cmd+K / Ctrl+K → toggle command palette
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setPaletteOpen(!useSystemBus.getState().paletteOpen);
+      }
+    }
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [setPaletteOpen]);
 
   async function handleDrop(e: React.DragEvent) {
     e.preventDefault();
@@ -70,6 +90,9 @@ export function Desktop() {
           </div>
         </div>
       )}
+
+      {/* Command palette */}
+      <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
 
       {/* Dashboard widget (above wallpaper, behind windows) */}
       <DashboardWidget />

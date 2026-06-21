@@ -23,6 +23,9 @@ import {
   Flame,
   Network,
   Brain,
+  Upload,
+  LayoutTemplate,
+  Zap,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { StartMenu } from "./StartMenu";
@@ -40,9 +43,14 @@ const ICONS: Record<string, any> = {
   timetracker: Clock,
   habits: Flame,
   wiki: Network,
+  importer: Upload,
+  myday: Brain,
+  templates: LayoutTemplate,
+  snippets: Zap,
 };
 
 const PINNED = [
+  "myday",
   "notes",
   "kanban",
   "pomodoro",
@@ -52,6 +60,8 @@ const PINNED = [
   "habits",
   "timetracker",
   "wiki",
+  "templates",
+  "snippets",
   "fileexplorer",
   "settings",
 ];
@@ -108,6 +118,14 @@ export function Taskbar() {
       <div className="fixed bottom-0 left-0 right-0 h-12 z-[9000] px-2 flex items-center justify-between bg-card/70 backdrop-blur-2xl border-t border-border/60">
         {/* Left: start + widgets */}
         <div className="flex items-center gap-1 w-[200px]">
+          <button
+            onClick={() => useSystemBus.getState().setPaletteOpen(true)}
+            className="h-9 px-3 rounded-md flex items-center gap-2 hover:bg-muted/60 transition text-muted-foreground text-xs"
+            title="Buscar (Ctrl+K)"
+          >
+            <Search className="w-3.5 h-3.5" />
+            <span className="hidden md:inline">Buscar</span>
+          </button>
           <button
             onClick={() => setStartOpen((v) => !v)}
             className={cn(

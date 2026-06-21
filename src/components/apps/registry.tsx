@@ -14,6 +14,9 @@ import { TimeTrackerApp } from "./timetracker/TimeTrackerApp";
 import { HabitsApp } from "./habits/HabitsApp";
 import { WikiApp } from "./wiki/WikiApp";
 import { MDImporterApp } from "./importer/MDImporterApp";
+import { MyDayApp } from "./myday/MyDayApp";
+import { TemplatesApp } from "./templates/TemplatesApp";
+import { SnippetsApp } from "./snippets/SnippetsApp";
 
 export interface AppComponentProps {
   win: WindowState;
@@ -32,4 +35,7 @@ export const APP_REGISTRY: Record<string, { component: ComponentType<AppComponen
   habits: { component: HabitsApp as any },
   wiki: { component: WikiApp as any },
   importer: { component: MDImporterApp as any },
+  myday: { component: MyDayApp as any },
+  templates: { component: TemplatesApp as any },
+  snippets: { component: SnippetsApp as any },
 };

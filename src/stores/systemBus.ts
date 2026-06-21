@@ -27,6 +27,10 @@ interface SystemBus {
   // Dashboard refresh
   dashboardTick: number;
   triggerDashboard: () => void;
+  // Command palette
+  paletteOpen: boolean;
+  setPaletteOpen: (b: boolean) => void;
+  togglePalette: () => void;
 }
 
 export interface NotificationItem {
@@ -73,4 +77,8 @@ export const useSystemBus = create<SystemBus>((set, get) => ({
 
   dashboardTick: 0,
   triggerDashboard: () => set((s) => ({ dashboardTick: s.dashboardTick + 1 })),
+
+  paletteOpen: false,
+  setPaletteOpen: (b) => set({ paletteOpen: b }),
+  togglePalette: () => set((s) => ({ paletteOpen: !s.paletteOpen })),
 }));

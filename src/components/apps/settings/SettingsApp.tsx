@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   useSettings,
   WALLPAPERS,
@@ -203,6 +203,42 @@ function AiTab() {
   const defaultModel = useSettings((s) => s.defaultModel);
   const setDefaultModel = useSettings((s) => s.setDefaultModel);
 
+  const [showTutorial, setShowTutorial] = useState(false);
+  const [dynamicModels, setDynamicModels] = useState<string[]>([]);
+  const [loadingModels, setLoadingModels] = useState(false);
+  const [modelsError, setModelsError] = useState("");
+
+  async function loadOpenRouterModels() {
+    setLoadingModels(true);
+    setModelsError("");
+    try {
+      // OpenRouter exposes /models publicly (no API key needed to list models)
+      const res = await fetch("https://openrouter.ai/api/v1/models");
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      const modelIds: string[] = (data.data ?? []).map((m: any) => m.id);
+      modelIds.sort();
+      setDynamicModels(modelIds);
+    } catch (e: any) {
+      setModelsError(e?.message ?? "Erro ao carregar modelos");
+    } finally {
+      setLoadingModels(false);
+    }
+  }
+
+  // Auto-load OpenRouter models when provider is selected and key is set
+  useEffect(() => {
+    if (aiProvider === "openrouter" && dynamicModels.length === 0 && !loadingModels) {
+      loadOpenRouterModels();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aiProvider]);
+
+  // Available models: dynamic list (if loaded) + fallback to static list
+  const availableModels = aiProvider === "openrouter" && dynamicModels.length > 0
+    ? dynamicModels
+    : PROVIDERS[aiProvider].models;
+
   return (
     <div className="max-w-2xl space-y-6">
       <section>
@@ -233,6 +269,50 @@ function AiTab() {
         </div>
       </section>
 
+      {/* OpenRouter tutorial */}
+      {aiProvider === "openrouter" && (
+        <section className="rounded-lg border border-primary/30 bg-primary/5 p-4">
+          <button
+            onClick={() => setShowTutorial((v) => !v)}
+            className="w-full flex items-center justify-between text-left"
+          >
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-semibold">📖 Como conseguir uma chave OpenRouter (grátis)</span>
+            </div>
+            <span className="text-xs text-muted-foreground">{showTutorial ? "ocultar" : "ver passo a passo"}</span>
+          </button>
+          {showTutorial && (
+            <div className="mt-3 space-y-3 text-xs">
+              <div className="p-3 rounded-md bg-background/60 border border-border/40">
+                <div className="font-semibold mb-1">Passo 1 — Criar conta</div>
+                <p>Acesse <a href="https://openrouter.ai" target="_blank" rel="noreferrer" className="text-primary underline">openrouter.ai</a> e clique em "Sign in". Você pode usar Google ou GitHub — leva 30 segundos.</p>
+              </div>
+              <div className="p-3 rounded-md bg-background/60 border border-border/40">
+                <div className="font-semibold mb-1">Passo 2 — Ir para chaves de API</div>
+                <p>No painel, clique em "Keys" no menu lateral (ou acesse <a href="https://openrouter.ai/keys" target="_blank" rel="noreferrer" className="text-primary underline">openrouter.ai/keys</a>).</p>
+              </div>
+              <div className="p-3 rounded-md bg-background/60 border border-border/40">
+                <div className="font-semibold mb-1">Passo 3 — Criar chave</div>
+                <p>Clique em "Create Key". Dê um nome (ex: <code className="font-mono bg-muted px-1 rounded">raooza</code>), clique em Create.</p>
+                <p className="mt-1 text-amber-600">⚠️ A chave aparece <strong>uma única vez</strong>. Copie imediatamente — não dá pra ver de novo.</p>
+              </div>
+              <div className="p-3 rounded-md bg-background/60 border border-border/40">
+                <div className="font-semibold mb-1">Passo 4 — Colar aqui</div>
+                <p>Cole a chave no campo abaixo. Ela fica salva apenas no seu navegador (localStorage), nunca é enviada para servidor.</p>
+              </div>
+              <div className="p-3 rounded-md bg-background/60 border border-border/40">
+                <div className="font-semibold mb-1">Passo 5 — (Opcional) Adicionar crédito</div>
+                <p>O OpenRouter tem modelos gratuitos (ex: <code className="font-mono bg-muted px-1 rounded">meta-llama/llama-3.3-70b-instruct:free</code>) que você pode usar sem pagar. Para modelos pagos (Claude, GPT-4), adicione crédito em "Credits".</p>
+              </div>
+              <div className="p-3 rounded-md bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-200">
+                <div className="font-semibold mb-1">💡 Dica de segurança</div>
+                <p>Como você tem uma VPS, pode criar um proxy que injeta a chave do servidor. Mas para uso pessoal, manter a chave no browser é seguro (só você acessa seu computador). Nunca compartilhe sua chave publicamente.</p>
+              </div>
+            </div>
+          )}
+        </section>
+      )}
+
       <section>
         <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
           <KeyRound className="w-4 h-4" />
@@ -243,12 +323,17 @@ function AiTab() {
             💡 Para GLM, você pode usar a chave padrão do ambiente (deixe vazio) ou fornecer sua própria API key da Z.ai.
           </div>
         )}
+        {aiProvider === "openrouter" && !apiKeys.openrouter && (
+          <div className="text-xs text-amber-600 mb-2 p-2 rounded bg-amber-500/10 border border-amber-500/30">
+            ⚠️ Sem chave, alguns modelos gratuitos ainda funcionam, mas a maioria requer autenticação.
+          </div>
+        )}
         <div className="flex items-center gap-2">
           <input
             type="password"
             value={apiKeys[aiProvider]}
             onChange={(e) => setApiKey(aiProvider, e.target.value)}
-            placeholder={aiProvider === "glm" ? "(opcional) zai-..." : "sk-..."}
+            placeholder={aiProvider === "glm" ? "(opcional) zai-..." : aiProvider === "openrouter" ? "sk-or-v1-..." : "sk-..."}
             className="flex-1 h-9 px-3 text-sm rounded-md bg-muted/40 border border-border/60 outline-none focus:border-primary"
           />
           <a
@@ -264,17 +349,59 @@ function AiTab() {
       </section>
 
       <section>
-        <h3 className="text-sm font-semibold mb-3">Modelo</h3>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-semibold">Modelo</h3>
+          {aiProvider === "openrouter" && (
+            <button
+              onClick={loadOpenRouterModels}
+              disabled={loadingModels}
+              className="text-xs text-primary hover:underline flex items-center gap-1"
+            >
+              {loadingModels ? "Carregando..." : dynamicModels.length > 0 ? `↻ Atualizar (${dynamicModels.length} modelos)` : "↻ Carregar lista dinâmica"}
+            </button>
+          )}
+        </div>
+        {modelsError && (
+          <div className="text-xs text-destructive mb-2">{modelsError}</div>
+        )}
         <select
           value={defaultModel[aiProvider]}
           onChange={(e) => setDefaultModel(aiProvider, e.target.value)}
           className="w-full h-9 px-3 text-sm rounded-md bg-muted/40 border border-border/60 outline-none focus:border-primary"
         >
-          {PROVIDERS[aiProvider].models.map((m) => (
+          {availableModels.map((m) => (
             <option key={m} value={m}>{m}</option>
           ))}
         </select>
+        {aiProvider === "openrouter" && dynamicModels.length > 0 && (
+          <div className="mt-2 text-[10px] text-muted-foreground">
+            ✓ Lista de modelos carregada dinamicamente da API do OpenRouter ({dynamicModels.length} modelos). Você também pode digitar o ID manualmente abaixo se quiser um que não está na lista.
+          </div>
+        )}
+        {aiProvider === "openrouter" && (
+          <input
+            type="text"
+            value={defaultModel.openrouter}
+            onChange={(e) => setDefaultModel("openrouter", e.target.value)}
+            placeholder="ou digite um ID de modelo manualmente (ex: anthropic/claude-3.5-sonnet)"
+            className="mt-2 w-full h-9 px-3 text-xs font-mono rounded-md bg-muted/40 border border-border/60 outline-none focus:border-primary"
+          />
+        )}
       </section>
+
+      {/* VPS tip */}
+      {aiProvider === "openrouter" && (
+        <section className="rounded-lg border border-border/40 bg-muted/20 p-3 text-xs text-muted-foreground">
+          <div className="font-semibold text-foreground mb-1">🌐 Usando sua VPS como proxy (opcional)</div>
+          <p>Como você mencionou que tem uma VPS, pode configurar um proxy lá que injeta a chave do OpenRouter e expor um endpoint próprio. Isso permite:</p>
+          <ul className="list-disc pl-4 mt-1 space-y-0.5">
+            <li>Usar o Raooza em qualquer dispositivo sem expor a chave</li>
+            <li>Rate limiting e logs centralizados</li>
+            <li>Cache de respostas idênticas</li>
+          </ul>
+          <p className="mt-1.5">O Raooza já é compatível com qualquer endpoint OpenAI-compatível. Basta apontar <code className="font-mono bg-muted px-1 rounded">baseUrl</code> em <code className="font-mono bg-muted px-1 rounded">src/lib/ai/providers.ts</code> para a URL do seu proxy.</p>
+        </section>
+      )}
     </div>
   );
 }

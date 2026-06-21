@@ -139,6 +139,29 @@ export interface ProjectImport {
   createdAt: string;
 }
 
+export interface Template {
+  id: string;
+  name: string;
+  description?: string;
+  category: "note" | "doc" | "wiki" | "kanban-tasks";
+  content: string; // markdown content (for note/doc/wiki) or JSON array of task titles (for kanban-tasks)
+  tags?: string[];
+  icon?: string;
+  isBuiltin?: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Snippet {
+  id: string;
+  trigger: string; // e.g. "/meeting"
+  name: string;
+  content: string; // expanded text
+  isBuiltin?: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export class RaoozaDB extends Dexie {
   notes!: Table<NoteRecord, string>;
   kanbanBoards!: Table<KanbanBoard, string>;
@@ -153,10 +176,12 @@ export class RaoozaDB extends Dexie {
   timeEntries!: Table<TimeEntry, string>;
   wikiPages!: Table<WikiPage, string>;
   imports!: Table<ProjectImport, string>;
+  templates!: Table<Template, string>;
+  snippets!: Table<Snippet, string>;
 
   constructor() {
     super("raooza");
-    this.version(3).stores({
+    this.version(5).stores({
       notes: "id, pinned, updatedAt, *tags",
       kanbanBoards: "id, updatedAt",
       kanbanTasks: "id, boardId, columnId, order, updatedAt, *tags",
@@ -170,6 +195,8 @@ export class RaoozaDB extends Dexie {
       timeEntries: "id, taskId, startedAt, endedAt",
       wikiPages: "id, updatedAt, *tags",
       imports: "id, tag, createdAt",
+      templates: "id, category, name",
+      snippets: "id, &trigger, name",
     });
   }
 }

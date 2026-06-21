@@ -18,6 +18,9 @@ import {
   Flame,
   Network,
   Upload,
+  Brain,
+  LayoutTemplate,
+  Zap,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSettings } from "@/stores/settingsStore";
@@ -35,6 +38,9 @@ const ICONS: Record<string, any> = {
   habits: Flame,
   wiki: Network,
   importer: Upload,
+  myday: Brain,
+  templates: LayoutTemplate,
+  snippets: Zap,
 };
 
 interface Props {
