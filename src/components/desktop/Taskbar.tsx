@@ -29,6 +29,7 @@ import {
   Video,
   MessageCircle,
   GraduationCap,
+  Radar,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { StartMenu } from "./StartMenu";
@@ -53,9 +54,11 @@ const ICONS: Record<string, any> = {
   video: Video,
   messages: MessageCircle,
   youtube: GraduationCap,
+  intel: Radar,
 };
 
 const PINNED = [
+  "intel",
   "myday",
   "messages",
   "youtube",

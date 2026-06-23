@@ -20,6 +20,7 @@ import { SnippetsApp } from "./snippets/SnippetsApp";
 import { VideoPlannerApp } from "./video/VideoPlannerApp";
 import { MessagesApp } from "./messages/MessagesApp";
 import { YouTubeStudioApp } from "./youtube/YouTubeStudioApp";
+import { IntelApp } from "./intel/IntelApp";
 
 export interface AppComponentProps {
   win: WindowState;
@@ -44,4 +45,5 @@ export const APP_REGISTRY: Record<string, { component: ComponentType<AppComponen
   video: { component: VideoPlannerApp as any },
   messages: { component: MessagesApp as any },
   youtube: { component: YouTubeStudioApp as any },
+  intel: { component: IntelApp as any },
 };

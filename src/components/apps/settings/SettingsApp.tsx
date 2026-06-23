@@ -8,7 +8,7 @@ import {
   type AIProvider,
 } from "@/stores/settingsStore";
 import { PROVIDERS, apiUrl } from "@/lib/ai/providers";
-import { Palette, ImageIcon, Bot, Sun, Moon, Check, ExternalLink, KeyRound } from "lucide-react";
+import { Palette, ImageIcon, Bot, Sun, Moon, Check, ExternalLink, KeyRound, Radar } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type Tab = "appearance" | "wallpaper" | "ai";
@@ -67,6 +67,8 @@ function AppearanceTab() {
   const setMode = useSettings((s) => s.setMode);
   const accent = useSettings((s) => s.accent);
   const setAccent = useSettings((s) => s.setAccent);
+  const showIntelOnBoot = useSettings((s) => s.showIntelOnBoot);
+  const setShowIntelOnBoot = useSettings((s) => s.setShowIntelOnBoot);
 
   return (
     <div className="max-w-xl space-y-6">
@@ -114,6 +116,41 @@ function AppearanceTab() {
             </button>
           ))}
         </div>
+      </section>
+
+      {/* AI Radar on boot */}
+      <section>
+        <h3 className="text-sm font-semibold mb-3">Inicialização</h3>
+        <button
+          onClick={() => setShowIntelOnBoot(!showIntelOnBoot)}
+          className={cn(
+            "w-full text-left p-3 rounded-lg border-2 transition flex items-start gap-3",
+            showIntelOnBoot ? "border-primary bg-primary/5" : "border-border hover:bg-muted/40",
+          )}
+        >
+          <div
+            className="w-9 h-9 rounded-lg grid place-items-center flex-shrink-0 text-white"
+            style={{ background: showIntelOnBoot ? "var(--accent-color)" : "#64748B" }}
+          >
+            <Radar className="w-4 h-4" />
+          </div>
+          <div className="flex-1">
+            <div className="text-sm font-medium flex items-center gap-2">
+              Mostrar AI Radar ao ligar
+              <span
+                className={cn(
+                  "text-[10px] px-1.5 py-0.5 rounded-full font-semibold",
+                  showIntelOnBoot ? "bg-green-500/20 text-green-700 dark:text-green-300" : "bg-muted text-muted-foreground",
+                )}
+              >
+                {showIntelOnBoot ? "LIGADO" : "DESLIGADO"}
+              </span>
+            </div>
+            <div className="text-xs text-muted-foreground mt-0.5">
+              Ao iniciar o Raooza, vasculha a internet por novidades em IA e mostra um dashboard antes de ir pro desktop. Pode levar 1-3 minutos.
+            </div>
+          </div>
+        </button>
       </section>
     </div>
   );
