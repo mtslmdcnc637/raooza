@@ -263,6 +263,22 @@ function ThemeCard({ theme, index, onClick }: { theme: IntelTheme; index: number
 
 function ThemeDetail({ theme, onBack }: { theme: IntelTheme; onBack: () => void }) {
   const open = useWindowStore((s) => s.open);
+  const [videos, setVideos] = useState<IntelVideo[]>(theme.videos || []);
+  const [loadingVideos, setLoadingVideos] = useState(false);
+
+  // Lazy-load YouTube videos when theme detail opens
+  useEffect(() => {
+    if (videos.length > 0) return; // already have videos
+    setLoadingVideos(true);
+    const keywords = (theme.keywords || []).slice(0, 3).join(" ") || theme.title;
+    fetch(`/api/intel/videos?keywords=${encodeURIComponent(keywords)}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.videos) setVideos(data.videos);
+      })
+      .catch(() => {})
+      .finally(() => setLoadingVideos(false));
+  }, [theme.title]);
 
   function openInYouTube(video: IntelVideo) {
     // Open in YouTube Studio app if available
@@ -286,7 +302,7 @@ function ThemeDetail({ theme, onBack }: { theme: IntelTheme; onBack: () => void 
         <div className="flex-1 min-w-0">
           <div className="text-sm font-semibold truncate">{theme.title}</div>
           <div className="text-[10px] text-muted-foreground">
-            {theme.sources?.length || 0} matérias · {theme.videos?.length || 0} vídeos
+            {theme.sources?.length || 0} matérias · {videos.length || 0} vídeos
           </div>
         </div>
       </div>
@@ -308,13 +324,19 @@ function ThemeDetail({ theme, onBack }: { theme: IntelTheme; onBack: () => void 
         </div>
 
         {/* Videos */}
-        {theme.videos?.length > 0 && (
+        {loadingVideos && (
+          <div className="text-center py-4 text-xs text-muted-foreground flex items-center justify-center gap-2">
+            <Loader2 className="w-3 h-3 animate-spin" />
+            Buscando vídeos no YouTube...
+          </div>
+        )}
+        {videos.length > 0 && (
           <div>
             <div className="text-[10px] uppercase font-semibold text-muted-foreground mb-2 flex items-center gap-1">
               <Youtube className="w-3 h-3" /> Vídeos no YouTube
             </div>
             <div className="space-y-2">
-              {theme.videos.map((v) => (
+              {videos.map((v) => (
                 <button
                   key={v.videoId}
                   onClick={() => openInYouTube(v)}
@@ -367,7 +389,7 @@ function ThemeDetail({ theme, onBack }: { theme: IntelTheme; onBack: () => void 
           </div>
         )}
 
-        {(!theme.sources || theme.sources.length === 0) && (!theme.videos || theme.videos.length === 0) && (
+        {(!theme.sources || theme.sources.length === 0) && videos.length === 0 && !loadingVideos && (
           <div className="text-center py-8 text-xs text-muted-foreground">
             Sem conteúdo detalhado para este tema.
           </div>

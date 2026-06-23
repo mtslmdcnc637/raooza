@@ -3,5 +3,12 @@
   "framework": "nextjs",
   "buildCommand": "bun run build",
   "installCommand": "bun install",
-  "regions": ["gru1"]
+  "regions": ["gru1"],
+  "functions": {
+    "/api/intel": { "maxDuration": 60 },
+    "/api/import-md": { "maxDuration": 300 },
+    "/api/ai": { "maxDuration": 60 },
+    "/api/myday": { "maxDuration": 60 },
+    "/api/youtube-transcript": { "maxDuration": 30 }
+  }
 }
