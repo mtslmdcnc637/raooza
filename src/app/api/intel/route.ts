@@ -89,10 +89,26 @@ function extractYouTubeId(url: string): string | null {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}));
-    const providerId = (body.provider as AIProvider) || "glm";
+    const providerId = body.provider as AIProvider;
     const apiKey = (body.apiKey as string) ?? "";
     const model = (body.model as string) ?? "";
     const forceRefresh = !!body.forceRefresh;
+
+    // Validate provider — no default fallback to GLM
+    if (!providerId || !PROVIDERS[providerId]) {
+      return NextResponse.json(
+        { error: "Provedor de IA não configurado. Vá em Configurações > IA e selecione um provedor." },
+        { status: 400 },
+      );
+    }
+
+    // For non-GLM providers, API key is required (GLM can use env SDK)
+    if (providerId !== "glm" && !apiKey) {
+      return NextResponse.json(
+        { error: `API key necessária para ${PROVIDERS[providerId].name}. Configure em Configurações > IA.` },
+        { status: 400 },
+      );
+    }
 
     // Return cached if fresh
     if (!forceRefresh && cachedIntel && Date.now() - cachedAt < CACHE_TTL_MS) {

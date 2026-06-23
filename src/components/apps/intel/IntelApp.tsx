@@ -55,6 +55,10 @@ export function IntelApp({ autoFetch = false }: { autoFetch?: boolean }) {
   const [data, setData] = useState<IntelResult | null>(null);
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
   const setLastIntelAt = useSettings((s) => s.setLastIntelAt);
+  // Subscribe to provider + apiKey changes so we always use current values
+  const aiProvider = useSettings((s) => s.aiProvider);
+  const apiKey = useSettings((s) => s.apiKeys[s.aiProvider]);
+  const defaultModel = useSettings((s) => s.defaultModel[s.aiProvider]);
 
   useEffect(() => {
     if (autoFetch) fetchIntel();
@@ -64,14 +68,25 @@ export function IntelApp({ autoFetch = false }: { autoFetch?: boolean }) {
     setLoading(true);
     setError("");
     try {
-      const settings = useSettings.getState();
+      // Read fresh state at call time
+      const s = useSettings.getState();
+      const provider = s.aiProvider;
+      const key = s.apiKeys[provider] || "";
+
+      // Pre-check: if no API key for non-GLM provider, show clear error
+      if (provider !== "glm" && !key) {
+        setError(`Configure sua API key do ${provider === "openrouter" ? "OpenRouter" : "DeepSeek"} em Configurações > IA para usar o AI Radar.`);
+        setLoading(false);
+        return;
+      }
+
       const res = await fetch("/api/intel", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          provider: settings.aiProvider,
-          apiKey: settings.apiKeys[settings.aiProvider],
-          model: settings.defaultModel[settings.aiProvider],
+          provider,
+          apiKey: key,
+          model: s.defaultModel[provider],
           forceRefresh: force,
         }),
       });
