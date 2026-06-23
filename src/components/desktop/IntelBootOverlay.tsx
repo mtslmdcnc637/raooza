@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useSettings } from "@/stores/settingsStore";
+import { apiUrl } from "@/lib/ai/providers";
 import { IntelApp } from "@/components/apps/intel/IntelApp";
 import { Radar, Loader2, X } from "lucide-react";
 
@@ -136,7 +137,7 @@ function IntelAppAutoFetch({ onReady }: { onReady: () => void }) {
       }
 
       try {
-        const res = await fetch("/api/intel", {
+        const res = await fetch(apiUrl("/api/intel"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({

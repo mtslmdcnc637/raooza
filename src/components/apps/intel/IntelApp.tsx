@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useSettings } from "@/stores/settingsStore";
 import { useWindowStore } from "@/stores/windowStore";
+import { apiUrl } from "@/lib/ai/providers";
 import {
   Radar,
   Loader2,
@@ -80,7 +81,7 @@ export function IntelApp({ autoFetch = false }: { autoFetch?: boolean }) {
         return;
       }
 
-      const res = await fetch("/api/intel", {
+      const res = await fetch(apiUrl("/api/intel"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -271,7 +272,7 @@ function ThemeDetail({ theme, onBack }: { theme: IntelTheme; onBack: () => void 
     if (videos.length > 0) return; // already have videos
     setLoadingVideos(true);
     const keywords = (theme.keywords || []).slice(0, 3).join(" ") || theme.title;
-    fetch(`/api/intel/videos?keywords=${encodeURIComponent(keywords)}`)
+    fetch(apiUrl(`/api/intel/videos?keywords=${encodeURIComponent(keywords)}`))
       .then((r) => r.json())
       .then((data) => {
         if (data.videos) setVideos(data.videos);
