@@ -114,29 +114,45 @@ function IntelAppAutoFetch({ onReady }: { onReady: () => void }) {
 
   useEffect(() => {
     if (triggered) return;
+
+    // Wait for settings to be hydrated from localStorage before reading
+    const settings = useSettings.getState();
+    if (!settings.apiKeys) {
+      // Settings not hydrated yet — retry in 500ms
+      const t = setTimeout(() => setTriggered(false), 500);
+      return () => clearTimeout(t);
+    }
+
     setTriggered(true);
-    // Trigger fetch via direct API call
     async function fetchIntel() {
-      const settings = useSettings.getState();
+      const s = useSettings.getState();
+      const provider = s.aiProvider;
+      const apiKey = s.apiKeys[provider] || "";
+
+      // Skip if no valid configuration
+      if (provider !== "glm" && !apiKey) {
+        onReady();
+        return;
+      }
+
       try {
         const res = await fetch("/api/intel", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            provider: settings.aiProvider,
-            apiKey: settings.apiKeys[settings.aiProvider],
-            model: settings.defaultModel[settings.aiProvider],
+            provider,
+            apiKey,
+            model: s.defaultModel[provider],
             forceRefresh: false,
           }),
         });
         const data = await res.json();
         if (res.ok) {
-          settings.setLastIntelAt(data.fetchedAt);
+          s.setLastIntelAt(data.fetchedAt);
         }
       } catch (e) {
         // ignore — user can retry from app
       } finally {
-        // Signal ready regardless (success or error)
         onReady();
       }
     }
