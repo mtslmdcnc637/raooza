@@ -462,6 +462,18 @@ export const APP_MANIFESTS: AppManifest[] = [
     category: "productivity",
     actions: [],
   },
+  {
+    id: "intel",
+    name: "AI Radar",
+    description: "Vasculha a internet por novidades em IA e agrupa em temas com vídeos",
+    icon: null as any,
+    defaultSize: { width: 900, height: 700 },
+    minSize: { width: 500, height: 500 },
+    resizable: true,
+    pinnable: true,
+    category: "ai",
+    actions: [],
+  },
 ];
 
 // System-level actions (not bound to a single app)

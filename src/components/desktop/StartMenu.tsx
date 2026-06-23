@@ -24,6 +24,7 @@ import {
   Video,
   MessageCircle,
   GraduationCap,
+  Radar,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSettings } from "@/stores/settingsStore";
@@ -47,6 +48,7 @@ const ICONS: Record<string, any> = {
   video: Video,
   messages: MessageCircle,
   youtube: GraduationCap,
+  intel: Radar,
 };
 
 interface Props {

@@ -70,6 +70,8 @@ interface SettingsStore {
   apiKeys: Record<AIProvider, string>;
   defaultModel: Record<AIProvider, string>;
   booted: boolean;
+  showIntelOnBoot: boolean; // show AI Radar after boot
+  lastIntelAt?: string; // ISO timestamp of last intel fetch
   // setters
   setMode: (m: ThemeMode) => void;
   toggleMode: () => void;
@@ -80,6 +82,8 @@ interface SettingsStore {
   setApiKey: (p: AIProvider, key: string) => void;
   setDefaultModel: (p: AIProvider, model: string) => void;
   setBooted: (b: boolean) => void;
+  setShowIntelOnBoot: (b: boolean) => void;
+  setLastIntelAt: (s: string) => void;
   hydrate: () => void;
 }
 
@@ -108,6 +112,8 @@ export const useSettings = create<SettingsStore>((set, get) => ({
     deepseek: "deepseek-chat",
   },
   booted: false,
+  showIntelOnBoot: false,
+  lastIntelAt: undefined,
 
   setMode: (mode) => {
     set({ mode });
@@ -146,6 +152,14 @@ export const useSettings = create<SettingsStore>((set, get) => ({
     set({ booted });
     persist();
   },
+  setShowIntelOnBoot: (showIntelOnBoot) => {
+    set({ showIntelOnBoot });
+    persist();
+  },
+  setLastIntelAt: (lastIntelAt) => {
+    set({ lastIntelAt });
+    persist();
+  },
 
   hydrate: () => {
     const data = loadFromStorage();
@@ -165,6 +179,8 @@ function persist() {
     apiKeys: s.apiKeys,
     defaultModel: s.defaultModel,
     booted: s.booted,
+    showIntelOnBoot: s.showIntelOnBoot,
+    lastIntelAt: s.lastIntelAt,
   };
   localStorage.setItem(LS_KEY, JSON.stringify(slice));
 }
