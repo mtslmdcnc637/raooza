@@ -1,7 +1,7 @@
-// Raooza OS - AI Intelligence API
-// Crawls the web for AI news, clusters into themes via LLM.
-// YouTube videos are fetched LAZILY via /api/intel/videos?theme=...
-// to keep initial response under 10s (Vercel Hobby limit).
+// Raooza OS - AI Intelligence API (Vercel fallback)
+// Uses DuckDuckGo for web search (no API key needed) + LLM for clustering
+// NOTE: This is a fallback when no VPS backend is configured.
+// The main implementation lives in backend/index.js
 
 import { NextRequest, NextResponse } from "next/server";
 import { PROVIDERS, openAICompatibleChat } from "@/lib/ai/providers";
@@ -11,20 +11,16 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-// === Cache ===
 let cachedIntel: any = null;
 let cachedAt = 0;
-const CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours
+const CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 
-// === Reduced queries (was 8, now 4 — much faster) ===
 const SEARCH_QUERIES = [
   "AI news this week breakthroughs 2026",
   "new AI model release GPT Claude Gemini LLM",
   "AI tools agents automation 2026",
   "artificial intelligence latest development",
 ];
-
-// === Helpers ===
 
 interface SearchResult {
   url: string;
@@ -34,21 +30,55 @@ interface SearchResult {
   date?: string;
 }
 
+// DuckDuckGo HTML search — free, no API key required
 async function webSearch(query: string, num = 5): Promise<SearchResult[]> {
   try {
-    const ZAIMod: any = await import("z-ai-web-dev-sdk");
-    const ZAI = ZAIMod.default || ZAIMod.ZAI || ZAIMod;
-    const zai = await ZAI.create();
-    const results = await zai.functions.invoke("web_search", { query, num });
-    return (results ?? []).map((r: any) => ({
-      url: r.url,
-      name: r.name,
-      snippet: r.snippet || "",
-      host_name: r.host_name || "",
-      date: r.date || "",
-    }));
+    const url = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
+    const res = await fetch(url, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml",
+        "Accept-Language": "en-US,en;q=0.9,pt-BR;q=0.8",
+      },
+    });
+    if (!res.ok) throw new Error(`DuckDuckGo HTTP ${res.status}`);
+    const html = await res.text();
+
+    const results: SearchResult[] = [];
+    const resultRegex = /<a[^>]+class="result__a"[^>]+href="([^"]+)"[^>]*>(.*?)<\/a>[\s\S]*?<a[^>]+class="result__snippet"[^>]*>(.*?)<\/a>/g;
+    let match;
+    while ((match = resultRegex.exec(html)) !== null && results.length < num) {
+      let rawUrl = match[1];
+      const uddgMatch = rawUrl.match(/uddg=([^&]+)/);
+      if (uddgMatch) rawUrl = decodeURIComponent(uddgMatch[1]);
+      const title = match[2].replace(/<[^>]+>/g, "").trim();
+      const snippet = match[3].replace(/<[^>]+>/g, "").trim();
+      let hostName = "";
+      try { hostName = new URL(rawUrl).hostname; } catch {}
+      if (title && rawUrl.startsWith("http")) {
+        results.push({ url: rawUrl, name: title, snippet, host_name: hostName, date: "" });
+      }
+    }
+
+    // Fallback: simpler regex
+    if (results.length === 0) {
+      const simpleRegex = /class="result__a"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g;
+      while ((match = simpleRegex.exec(html)) !== null && results.length < num) {
+        let rawUrl = match[1];
+        const uddgMatch = rawUrl.match(/uddg=([^&]+)/);
+        if (uddgMatch) rawUrl = decodeURIComponent(uddgMatch[1]);
+        const title = match[2].replace(/<[^>]+>/g, "").trim();
+        let hostName = "";
+        try { hostName = new URL(rawUrl).hostname; } catch {}
+        if (title && rawUrl.startsWith("http")) {
+          results.push({ url: rawUrl, name: title, snippet: "", host_name: hostName, date: "" });
+        }
+      }
+    }
+
+    return results;
   } catch (e: any) {
-    console.error("[intel] web_search failed:", e?.message);
+    console.error("[intel] DuckDuckGo search failed:", e?.message);
     return [];
   }
 }
@@ -79,8 +109,6 @@ function extractYouTubeId(url: string): string | null {
   return null;
 }
 
-// === Main handler: web search + clustering ONLY (no YouTube) ===
-
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}));
@@ -102,12 +130,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Return cached if fresh
     if (!forceRefresh && cachedIntel && Date.now() - cachedAt < CACHE_TTL_MS) {
       return NextResponse.json({ ...cachedIntel, cached: true });
     }
 
-    // === Step 1: parallel web searches (4 queries, 5 results each = 20 max) ===
+    // Step 1: DuckDuckGo searches
     const searchPromises = SEARCH_QUERIES.map((q) => webSearch(q, 5));
     const searchResults = (await Promise.all(searchPromises)).flat();
     const deduped = dedupeByURL(searchResults);
@@ -119,7 +146,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // === Step 2: cluster into themes via LLM ===
+    // Step 2: cluster via LLM
     const provider = PROVIDERS[providerId];
     const itemsForLLM = deduped.slice(0, 30).map((r) => ({
       title: r.name,
@@ -137,22 +164,30 @@ Regras: agrupe matérias relacionadas, 2-6 fontes por tema, keywords em portugu�
 
 Dados: ${JSON.stringify(itemsForLLM)}`;
 
-    let clusterText = "";
     const messages = [
       { role: "system" as const, content: clusterPrompt },
       { role: "user" as const, content: "Agrupe." },
     ];
 
+    // For GLM without user key, use SDK. For all others, use OpenAI-compatible.
+    let clusterText = "";
     if (providerId === "glm" && !apiKey) {
-      const ZAIMod: any = await import("z-ai-web-dev-sdk");
-      const ZAI = ZAIMod.default || ZAIMod.ZAI || ZAIMod;
-      const zai = await ZAI.create();
-      const res = await zai.chat.completions.create({
-        model: model || provider.defaultModel,
-        messages,
-        temperature: 0.3,
-      });
-      clusterText = res.choices?.[0]?.message?.content ?? "";
+      try {
+        const ZAIMod: any = await import("z-ai-web-dev-sdk");
+        const ZAI = ZAIMod.default || ZAIMod.ZAI || ZAIMod;
+        const zai = await ZAI.create();
+        const res = await zai.chat.completions.create({
+          model: model || provider.defaultModel,
+          messages,
+          temperature: 0.3,
+        });
+        clusterText = res.choices?.[0]?.message?.content ?? "";
+      } catch (e: any) {
+        return NextResponse.json(
+          { error: `Erro ao usar GLM: ${e.message}. Configure OpenRouter em Configurações > IA.` },
+          { status: 500 },
+        );
+      }
     } else {
       clusterText = await openAICompatibleChat(
         provider.baseUrl,
@@ -179,14 +214,9 @@ Dados: ${JSON.stringify(itemsForLLM)}`;
       );
     }
 
-    // === NO YouTube search here — done lazily via GET /api/intel/videos ===
-    const themesWithoutVideos = (parsed.themes as any[]).slice(0, 6).map((t) => ({
-      ...t,
-      videos: [], // will be fetched on demand
-    }));
-
+    const themes = (parsed.themes as any[]).slice(0, 6).map((t) => ({ ...t, videos: [] }));
     const result = {
-      themes: themesWithoutVideos,
+      themes,
       totalSources: deduped.length,
       fetchedAt: new Date().toISOString(),
     };
@@ -201,14 +231,13 @@ Dados: ${JSON.stringify(itemsForLLM)}`;
   }
 }
 
-// === GET /api/intel/videos?keywords=... — lazy YouTube search per theme ===
+// GET /api/intel/videos?keywords=... — lazy YouTube search
 export async function GET(req: NextRequest) {
   try {
     const keywords = req.nextUrl.searchParams.get("keywords");
     if (!keywords) {
       return NextResponse.json({ error: "keywords required" }, { status: 400 });
     }
-
     const query = `${keywords} português brasileiro`;
     const ytResults = await webSearch(`site:youtube.com ${query}`, 5);
     const videos = ytResults
@@ -225,7 +254,6 @@ export async function GET(req: NextRequest) {
       })
       .filter(Boolean)
       .slice(0, 5);
-
     return NextResponse.json({ videos });
   } catch (e: any) {
     return NextResponse.json({ error: e?.message }, { status: 500 });

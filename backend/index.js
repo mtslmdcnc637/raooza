@@ -440,7 +440,7 @@ ${(context?.activeTags ?? []).map((t) => `- #${t.tag} (${t.count} itens)`).join(
   }
 });
 
-// === AI INTEL — web search + clustering (uses z-ai-web-dev-sdk) ===
+// === AI INTEL — web search (DuckDuckGo, no API key needed) + LLM clustering ===
 
 const INTEL_SEARCH_QUERIES = [
   "AI news this week breakthroughs 2026",
@@ -453,21 +453,67 @@ let intelCache = null;
 let intelCacheAt = 0;
 const INTEL_CACHE_TTL = 6 * 60 * 60 * 1000; // 6h
 
+// DuckDuckGo HTML search — free, no API key required
 async function webSearch(query, num = 5) {
   try {
-    const ZAIMod = await import("z-ai-web-dev-sdk");
-    const ZAI = ZAIMod.default || ZAIMod.ZAI || ZAIMod;
-    const zai = await ZAI.create();
-    const results = await zai.functions.invoke("web_search", { query, num });
-    return (results || []).map((r) => ({
-      url: r.url,
-      name: r.name,
-      snippet: r.snippet || "",
-      host_name: r.host_name || "",
-      date: r.date || "",
-    }));
+    const url = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
+    const res = await fetch(url, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml",
+        "Accept-Language": "en-US,en;q=0.9,pt-BR;q=0.8",
+      },
+    });
+    if (!res.ok) throw new Error(`DuckDuckGo HTTP ${res.status}`);
+    const html = await res.text();
+
+    // Parse results from DuckDuckGo HTML
+    const results = [];
+    const resultRegex = /<a[^>]+class="result__a"[^>]+href="([^"]+)"[^>]*>(.*?)<\/a>[\s\S]*?<a[^>]+class="result__snippet"[^>]*>(.*?)<\/a>/g;
+    let match;
+    while ((match = resultRegex.exec(html)) !== null && results.length < num) {
+      let rawUrl = match[1];
+      // DuckDuckGo wraps URLs in redirect: //duckduckgo.com/l/?uddg=ENCODED_URL
+      const uddgMatch = rawUrl.match(/uddg=([^&]+)/);
+      if (uddgMatch) {
+        rawUrl = decodeURIComponent(uddgMatch[1]);
+      }
+      const title = match[2].replace(/<[^>]+>/g, "").trim();
+      const snippet = match[3].replace(/<[^>]+>/g, "").trim();
+      let hostName = "";
+      try { hostName = new URL(rawUrl).hostname; } catch {}
+
+      if (title && rawUrl && rawUrl.startsWith("http")) {
+        results.push({
+          url: rawUrl,
+          name: title,
+          snippet: snippet,
+          host_name: hostName,
+          date: "",
+        });
+      }
+    }
+
+    // Fallback: try simpler regex if no results matched
+    if (results.length === 0) {
+      const simpleRegex = /class="result__a"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g;
+      while ((match = simpleRegex.exec(html)) !== null && results.length < num) {
+        let rawUrl = match[1];
+        const uddgMatch = rawUrl.match(/uddg=([^&]+)/);
+        if (uddgMatch) rawUrl = decodeURIComponent(uddgMatch[1]);
+        const title = match[2].replace(/<[^>]+>/g, "").trim();
+        let hostName = "";
+        try { hostName = new URL(rawUrl).hostname; } catch {}
+        if (title && rawUrl.startsWith("http")) {
+          results.push({ url: rawUrl, name: title, snippet: "", host_name: hostName, date: "" });
+        }
+      }
+    }
+
+    log("debug", `DuckDuckGo search "${query}" returned ${results.length} results`);
+    return results;
   } catch (e) {
-    log("error", "webSearch failed:", e.message);
+    log("error", "webSearch (DuckDuckGo) failed:", e.message);
     return [];
   }
 }
